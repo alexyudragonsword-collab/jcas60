@@ -1,0 +1,256 @@
+engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; no PA / LNA nonlinearity) -- compression conclusions are closed-form only
+jcas60 0.1.0; milestone 0: sensing with the 802.11ay waveform (no claim of 802.11bf conformance: spec_sources has no 802.11bf entry yet)
+one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, noise level known (11.75 dB per cell)
+tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from spec numbers, [derived/assumed] computed from at least one assumed number
+
+== 0. the shared front-end numbers (one instance; row A's own inputs, from its report, beside them) ==
+  TX power, conducted [dBm]                     12 [spec]   row A's report: 12 [spec]        equal   (rx60.radar_iwr6843#tx_power_dbm)
+  TX antenna gain [dBi]                      10 [assumed]   row A's report: 10 [assumed]     equal   (jcas60.antenna_gain_dbi#tx)
+  RX antenna gain [dBi]                      10 [assumed]   row A's report: 10 [assumed]     equal   (jcas60.antenna_gain_dbi#rx)
+  RX noise figure [dB]                          12 [spec]   row A's report: 12 [spec]        equal   (rx60.radar_iwr6843#nf_db)
+  RX gain setting [dB]                       40 [assumed]   row A's report: 40 [assumed]     equal   (jcas60.rx_gain_db)
+  RX in-band P1dB at that gain [dBm]           -34 [spec]   row A's report: -34 [spec]       equal   (rx60.radar_iwr6843_fig7_2#p1db_inband_dbm@gain_db=40)
+  PA back-off                            one rule for every row: max(0, TX power + antenna gain - the row's EIRP limit); row A's report has 8 [assumed] dB, the rule gives 8 dB
+  TX-RX isolation [dB]                       20 [derived]   antenna arrays without EBG (low end) (isolation.tx_rx_tue2018_no_ebg_min_db)
+  TX-RX isolation [dB]                          40 [spec]   antenna arrays with EBG (isolation.tx_rx_tue2018#with_ebg_db)
+  LO phase noise                         ay rows: PSD0 -90 [spec] dBc/Hz, pole 1 MHz, zero 100 MHz (-93.0 dBc/Hz at 1 MHz; tgad_em.pn_params). NOT the same in row A: its LO is fmcw_radar's chirping ADPLL (15 GHz x 4), the one front-end number the rows do not share
+
+== 1. resolution and ambiguity ==
+row                                             bandwidth                   c/2B                   -3 dB width as processed              clean range            velocity res.              unambiguous v
+A  FMCW (fmcw_radar default)           4.00 [assumed] GHz 3.75 [derived/assumed] cm            5.34 [derived/assumed] cm, hann 14.99 [derived/assumed] m 0.390 [derived/assumed] m/s +-12.49 [derived/assumed] m/s
+B  ay SC Golay field, monostatic          1.76 [spec] GHz      8.52 [derived] cm 7.43 [derived/assumed] cm, none (the pulse)        10.90 [derived] m 0.387 [derived/assumed] m/s +-12.39 [derived/assumed] m/s
+C  ay SC Golay field, bistatic            1.76 [spec] GHz 9.83 [derived/assumed] cm 8.58 [derived/assumed] cm, none (the pulse) 13.40 [derived/assumed] m 0.447 [derived/assumed] m/s +-14.31 [derived/assumed] m/s
+  clean range: A by the IF band; the ay rows by the 128-chip cyclic prefix (beyond it a window no longer holds a cyclic shift of its sequence; the sequences themselves repeat after 512 chips = 43.6 m)
+  ay -3 dB width: closed form 0.8726 chips, waveform simulation 0.8725 chips (7.43 cm monostatic); roll-off 0.25 [assumed] (assumed.ay_sc_pulse, mmw60_trx)
+  range sidelobes: A -32.2 dB (hann window); ay, between the chips, the pulse's own: -14.6 dB at 1.5 chips, -21.2 dB at 2.5 chips, -27.8 dB at 3.5 chips (waveform simulation; no range window is applied)
+  bistatic (C): legs 5 m and 5 m, baseline 5 m, bistatic angle 60 deg; resolutions are along the bisector (jcas60.bistatic_geometry)
+
+== 2. link: EIRP, processing gain, SNR of the person at 5 m, range at Pd 0.9 ==
+row                                               limit             EIRP [dBm]                          processing gain          window loss           SNR(cell) [dB]       Pd          range at Pd 0.9 (SNR)   within the clean range
+A  FMCW (fmcw_radar default)                radar limit 14.00 [derived/assumed] 48.06 [derived/assumed] dB = 1000 samples x 64 chirps 3.52 [derived/assumed] dB  43.34 [derived/assumed]   1.0000      29.56 [derived/assumed] m              no: 14.99 m
+B  ay SC Golay field, monostatic    communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.68 [derived/assumed] m              no: 10.90 m
+B  ay SC Golay field, monostatic            radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      13.12 [derived/assumed] m              no: 10.90 m
+C  ay SC Golay field, bistatic      communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.68 [derived/assumed] m              no: 13.40 m
+C  ay SC Golay field, bistatic              radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      13.12 [derived/assumed] m                      yes
+  SNR(cell): thermal noise only, at the peak (no straddle); row A as its report gives it, its range at Pd 0.9 extrapolated here from that SNR by R^4 and the oxygen term
+  row A over row B, communication limit: +12.59 dB with 8 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x18.2 the chips, 0.68 ms a frame (2.0 % of the time, training alone)
+  row A over row B, radar limit: +14.59 dB with 6 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x28.8 the chips, 1.07 ms a frame (3.2 % of the time, training alone)
+  the ay budget, monostatic at 22 dBm: spreading 107.03 dB, oxygen 0.15 dB, echo -85.18 dBm, noise in 1.76 GHz -69.52 dBm, SNR per chip -15.66 dB
+
+== 3. the two roads (law 4): closed form against waveform simulation ==
+row                                               limit    closed, on the grid             simulation   difference   straddle                    read at   CA-CFAR  static path in the simulation
+A  FMCW (fmcw_radar default)                radar limit                      —                      —      +0.03 dB                                                  fmcw_radar's own two engines (time - statistical), from its example 00 as printed
+B  ay SC Golay field, monostatic    communication limit               29.87 dB               29.83 dB      -0.05 dB    0.87 dB         5.006 m, +1.99 m/s  detected  leakage at -28.0 dBm
+B  ay SC Golay field, monostatic            radar limit               27.87 dB               27.81 dB      -0.06 dB    0.87 dB         5.006 m, +1.98 m/s  detected  leakage at -30.0 dBm
+C  ay SC Golay field, bistatic      communication limit               29.37 dB               29.23 dB      -0.14 dB    1.37 dB         5.004 m, +2.00 m/s  detected  direct path at -50.1 dBm
+C  ay SC Golay field, bistatic              radar limit               27.37 dB               27.27 dB      -0.10 dB    1.37 dB         5.004 m, +2.01 m/s  detected  direct path at -52.1 dBm
+  simulation: mean of 8 frames; the floor is read off the zero-Doppler ridge of the static path; the ADC and the LO phase noise are off here (section 5 turns them on)
+
+== 4. the limit each row is held to (law 3: each at its own; the ay rows under both readings of the rule) ==
+row                                               limit                     rule           EIRP limit [dBm]          back-off [dB]              off-time required  off-time the frame leaves  tier
+A  FMCW (fmcw_radar default)                radar limit      47 CFR 15.255(c)(2)             14 [spec] peak            8 [assumed]    25.5 ms in any 33 ms [spec]                   26.60 ms  57.0-64.0 GHz, with off-time
+B  ay SC Golay field, monostatic    communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
+B  ay SC Golay field, monostatic            radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.70 ms  57.0-61.56 GHz, with off-time
+C  ay SC Golay field, bistatic      communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
+C  ay SC Golay field, bistatic              radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.70 ms  57.0-61.56 GHz, with off-time
+  the front end's full power is 22 [derived/assumed] dBm EIRP: one antenna does not reach the communication limit; the two readings differ by 2 dB of EIRP and by the off-time
+  radar reading of the ay rows: fmcw_radar's own check (vendored) on the 2.16 GHz channel 59.4-61.56 GHz, a burst of 64 packets of 3.055 us every 100 us, 30 frames a second
+
+== 5. what the receiver pays ==
+row                                                  ADC rate       channels                       bits   what the bits are
+A  FMCW (fmcw_radar default)                10 [assumed] MS/s    1 (real IF)            12.00 [assumed]   as configured
+B  ay SC Golay field, monostatic   3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
+C  ay SC Golay field, bistatic     3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
+  A: its leakage budget is not in its default report (the model is off in that config; its example 08 turns it on); an FMCW radar's leakage beats to near zero frequency and is filtered ahead of the ADC
+  B, communication limit (conducted 12 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
+      in-band compression    56.0 dB [derived/assumed]  (leakage 10 dB under the in-band P1dB; 46.0 dB to sit at P1dB itself)   closed form only
+      ADC quantisation       39.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
+      LO phase noise         43.0 dB [derived/assumed]  (shared LO, leakage delayed 0.1 ns: residual -44.4 dBc after range correlation)
+      -> 56.0 dB, set by the in-band compression
+      have 20 [derived] dB, antenna arrays without EBG (low end): short by 36.0 dB; leakage -8 dBm; ENOB needed 12.39
+          both roads, floor rise: ADC closed 14.18 dB / simulated 9.24 dB; LO phase noise closed 17.20 dB / simulated 17.29 dB
+          the ADC's error: thermal noise is 0.06 LSB rms, 69 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 9.25 dB, the rest is the zero-Doppler ridge
+          simulation, linear receiver and ideal ADC: SNR 29.83 dB with the leakage, 29.79 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.1 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -1.00 dB
+      have 40 [spec] dB, antenna arrays with EBG: short by 16.0 dB; leakage -28 dBm; ENOB needed 9.07
+          both roads, floor rise: ADC closed 0.97 dB / simulated 0.98 dB; LO phase noise closed 1.80 dB / simulated 1.85 dB
+          the ADC's error: thermal noise is 0.58 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.96 dB, the rest is the zero-Doppler ridge
+          simulation, linear receiver and ideal ADC: SNR 29.83 dB with the leakage, 29.79 dB without; with the ADC the zero-Doppler ridge at the target's range is -114.6 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -0.06 dB
+  B, radar limit (conducted 10 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
+      in-band compression    54.0 dB [derived/assumed]  (leakage 10 dB under the in-band P1dB; 44.0 dB to sit at P1dB itself)   closed form only
+      ADC quantisation       37.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
+      LO phase noise         41.0 dB [derived/assumed]  (shared LO, leakage delayed 0.1 ns: residual -44.4 dBc after range correlation)
+      -> 54.0 dB, set by the in-band compression
+      have 20 [derived] dB, antenna arrays without EBG (low end): short by 34.0 dB; leakage -10 dBm; ENOB needed 12.06
+          both roads, floor rise: ADC closed 12.27 dB / simulated 8.39 dB; LO phase noise closed 15.25 dB / simulated 15.34 dB
+          the ADC's error: thermal noise is 0.07 LSB rms, 61 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 8.40 dB, the rest is the zero-Doppler ridge
+          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.9 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.65 dB
+      have 40 [spec] dB, antenna arrays with EBG: short by 14.0 dB; leakage -30 dBm; ENOB needed 8.74
+          both roads, floor rise: ADC closed 0.64 dB / simulated 0.67 dB; LO phase noise closed 1.22 dB / simulated 1.26 dB
+          the ADC's error: thermal noise is 0.72 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.63 dB, the rest is the zero-Doppler ridge
+          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -115.0 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.04 dB
+  B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), communication limit: 30 dB gain: NF 15.6 dB, P1dB -24 dBm, needs 46 dB; 36 dB gain: NF 12.2 dB, P1dB -30 dBm, needs 52 dB; 40 dB gain: NF 11 dB, P1dB -34 dBm, needs 56 dB; 44 dB gain: NF 10.5 dB, P1dB -38 dBm, needs 60 dB; 48 dB gain: NF 10.3 dB, P1dB -42 dBm, needs 64 dB
+  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -1.06 dB)
+  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.83 dB)
+     C pays elsewhere: the two devices share no clock, so every packet's phase is taken from the direct path (simulated) and its timing and carrier offset from the preamble (not simulated)
+
+== 6. air time: 30 sensing frames a second, against a link at 4620 [derived/assumed] Mb/s (mmw60_trx's comparison table, ay_sc on channel 2) ==
+row                                               limit                        share of the time               throughput given up [Mb/s]
+A  FMCW (fmcw_radar default)                radar limit                19.20 % [derived/assumed]                    887 [derived/assumed]
+B  ay SC Golay field, monostatic    communication limit                 1.16 % [derived/assumed]                     54 [derived/assumed]
+B  ay SC Golay field, monostatic            radar limit        1.16 % ... 50 % [derived/assumed]            54 ... 2310 [derived/assumed]
+C  ay SC Golay field, bistatic      communication limit                 1.16 % [derived/assumed]                     54 [derived/assumed]
+C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [derived/assumed]            54 ... 2310 [derived/assumed]
+  A: the frame's 6.4 ms of chirps, during which this front end cannot communicate (jcas60.fmcw_airtime)
+  ay: 64 packets of 5376 chips (3.055 us) plus one SIFS (3 us) each; under the radar reading the upper figure is the off-time taken to bind every emission of the device (jcas60.radar_reading_airtime); C's figure is the transmitting device's
+
+== 7. a Golay pair's sidelobes when the target moves (waveform simulation: one packet, no noise, target on a chip) ==
+   radial velocity [m/s]     peak sidelobe in the zero zone [dBc]    peak [dB]     carrier turn over one sequence [rad]
+                     0.0                                   -281.5       0.0011                                 0.00e+00
+                     2.0                                    -87.9       0.0011                                 1.47e-03
+                    12.4                                    -72.1       0.0010                                 9.14e-03
+                    50.0                                    -60.0      -0.0009                                 3.69e-02
+                   200.0                                    -47.9      -0.0304                                 1.47e-01
+  0 m/s is the pair's exact cancellation at double precision; 12.4 m/s is the unambiguous velocity of section 1
+
+== 8. sensitivity: row B under the communication limit, closed form, one choice changed at a time ==
+  packets per frame x 2 (jcas60.sensing_burst)                                                  +3.01 dB -> SNR(cell)  33.76 dB   velocity resolution twice as fine, air time x 2
+  rectangular Doppler window (jcas60.doppler_window)                                            +1.76 dB -> SNR(cell)  32.51 dB   Doppler sidelobes -13 dB instead of -31 dB
+  the L-STF correlated as well (jcas60.sensing_field)                                           +4.95 dB -> SNR(cell)  35.70 dB   its composition has no public source
+  RCS at the top of the pedestrian range (target_rcs.deep2019_pedestrian_77g#co_pol_max_dbsm)  +15.00 dB -> SNR(cell)  45.75 dB   all three rows move together
+  the communication transceiver's numbers (rx60.comm_asada2011: antenna, NF, TX P1dB)          -16.70 dB -> SNR(cell)  14.05 dB   antennas -16.0 dB, NF +5.9 dB, TX power -6.6 dB; row A is not recomputed on them
+
+== 9. this library's own choices (every entry of data/assumed.yaml; what would move is in each entry's note) ==
+  jcas60.antenna_gain_dbi          {'tx': 10.0, 'rx': 10.0}  [assumed]
+  jcas60.rx_gain_db                40.0  [assumed]
+  jcas60.channel                   {'number': 2, 'width_hz': 2160000000.0}  [assumed]
+  jcas60.sensing_field             L-CEF：Gu512 与 Gv512 各做一次循环相关再相加；L-STF 不参与相关  [assumed]
+  jcas60.sensing_packet            {'fields': ['l_stf_chips', 'l_cef_chips', 'l_header_chips', 'edmg_header_a_chips'], 'data_blocks': 0, 'trn_units': 0}  [assumed]
+  jcas60.sensing_burst             {'n_packets': 64, 'interval_s': 0.0001, 'frames_per_s': 30.0}  [assumed]
+  jcas60.packet_overhead           {'sifs_per_packet': 1}  [assumed]
+  jcas60.doppler_window            hann  [assumed]
+  jcas60.adc                       {'samples_per_chip': 2, 'desense_allowed_db': 1.0}  [assumed]
+  jcas60.compression_margin_db     10.0  [assumed]
+  jcas60.leakage_delay_s           1e-10  [assumed]
+  jcas60.lo_phase_noise            tgad_em.pn_params 的单极点单零点模型，每台设备一个本振  [assumed]
+  jcas60.oxygen_frequency_ghz      60.0  [assumed]
+  jcas60.target                    {'range_m': 5.0, 'velocity_mps': 2.0}  [assumed]
+  jcas60.detection                 {'pd': 0.9}  [assumed]
+  jcas60.bistatic_geometry         {'r_tx_m': 5.0, 'r_rx_m': 5.0, 'baseline_m': 5.0}  [assumed]
+  jcas60.fmcw_airtime              FMCW 一帧的 chirp 串期间，这套前端不能通信  [assumed]
+  jcas60.radar_reading_airtime     {'lower': '关断时间只管感知的发射：与按通信限值读时同一个占比', 'upper': '关断时间管这台设备的全部发射：任意 33 ms 里至少关断规定的时长'}  [assumed]
+  jcas60.comm_limit_kind           average  [assumed]
+  jcas60.sim                       {'seed': 1, 'frames_averaged': 8, 'buffer_chips': 2048, 'exclude_doppler_bins': 4, 'exclude_range_lags': 8, 'cfar_guard': 2, 'cfar_train': 8}  [assumed]
+
+== 10. every reference read to build this table ==
+  assumed.ay_sc_pulse#rolloff                                                      0.25 [assumed]
+  assumed.ay_sc_pulse#shape                                                             [assumed]
+  assumed.converter_backoff_db                                                       12 [assumed]
+  assumed.converter_bits_per_octave                                                 0.5 [assumed]
+  assumed.converter_enob_ref                                                         10 [assumed]
+  dmg.cef_golay_layout#cef_chips                                                   1152 [spec]
+  dmg.cef_golay_layout#gu512                                                            [spec]
+  dmg.cef_golay_layout#gv512                                                            [spec]
+  dmg.cef_golay_layout#sc_order                                                         [spec]
+  dmg.golay_sequences#ga128                                                             [spec]
+  dmg.golay_sequences#gb128                                                             [spec]
+  dmg.phy_timing#sifs_s                                                           3e-06 [spec]
+  edmg.sc_params#chip_rate_hz                                                  1.76e+09 [spec]
+  edmg.sc_siso_preamble#edmg_header_a_chips                                        1024 [spec]
+  edmg.sc_siso_preamble#l_cef_chips                                                1152 [spec]
+  edmg.sc_siso_preamble#l_header_chips                                             1024 [spec]
+  edmg.sc_siso_preamble#l_stf_chips                                                2176 [spec]
+  fcc15255.band_high_hz                                                         7.1e+10 [spec]
+  fcc15255.band_low_hz                                                          5.7e+10 [spec]
+  fcc15255.eirp_avg_dbm                                                              40 [spec]
+  fcc15255.radar_57_59p4_indoor#band_high_hz                                   5.94e+10 [spec]
+  fcc15255.radar_57_59p4_indoor#band_low_hz                                     5.7e+10 [spec]
+  fcc15255.radar_57_59p4_indoor#peak_eirp_dbm                                        20 [spec]
+  fcc15255.radar_57_59p4_outdoor#band_high_hz                                  5.94e+10 [spec]
+  fcc15255.radar_57_59p4_outdoor#band_low_hz                                    5.7e+10 [spec]
+  fcc15255.radar_57_59p4_outdoor#peak_eirp_dbm                                       30 [spec]
+  fcc15255.radar_57_61p56#band_high_hz                                        6.156e+10 [spec]
+  fcc15255.radar_57_61p56#band_low_hz                                           5.7e+10 [spec]
+  fcc15255.radar_57_61p56#peak_eirp_dbm                                               3 [spec]
+  fcc15255.radar_57_61p56_off_time#band_high_hz                               6.156e+10 [spec]
+  fcc15255.radar_57_61p56_off_time#band_low_hz                                  5.7e+10 [spec]
+  fcc15255.radar_57_61p56_off_time#off_time_min_run_s                             0.002 [spec]
+  fcc15255.radar_57_61p56_off_time#off_time_sum_min_s                            0.0165 [spec]
+  fcc15255.radar_57_61p56_off_time#off_time_window_s                              0.033 [spec]
+  fcc15255.radar_57_61p56_off_time#peak_eirp_dbm                                     20 [spec]
+  fcc15255.radar_57_64#band_high_hz                                             6.4e+10 [spec]
+  fcc15255.radar_57_64#band_low_hz                                              5.7e+10 [spec]
+  fcc15255.radar_57_64#off_time_min_run_s                                         0.002 [spec]
+  fcc15255.radar_57_64#off_time_sum_min_s                                        0.0255 [spec]
+  fcc15255.radar_57_64#off_time_window_s                                          0.033 [spec]
+  fcc15255.radar_57_64#peak_eirp_dbm                                                 14 [spec]
+  fcc15255.radar_57_64_outdoor#band_high_hz                                     6.4e+10 [spec]
+  fcc15255.radar_57_64_outdoor#band_low_hz                                      5.7e+10 [spec]
+  fcc15255.radar_57_64_outdoor#off_time_min_run_s                                 0.002 [spec]
+  fcc15255.radar_57_64_outdoor#off_time_sum_min_s                                0.0165 [spec]
+  fcc15255.radar_57_64_outdoor#off_time_window_s                                  0.033 [spec]
+  fcc15255.radar_57_64_outdoor#peak_eirp_dbm                                         20 [spec]
+  fcc15255.radar_61_61p5#band_high_hz                                          6.15e+10 [spec]
+  fcc15255.radar_61_61p5#band_low_hz                                            6.1e+10 [spec]
+  fcc15255.radar_61_61p5#max_bandwidth_hz                                         5e+08 [spec]
+  fcc15255.radar_61_61p5#peak_eirp_dbm                                               43 [spec]
+  fcc15255.radar_default#band_high_hz                                           7.1e+10 [spec]
+  fcc15255.radar_default#band_low_hz                                            5.7e+10 [spec]
+  fcc15255.radar_default#peak_conducted_dbm                                         -10 [spec]
+  fcc15255.radar_default#peak_eirp_dbm                                               10 [spec]
+  fcc15255.radar_uav_60_64#band_high_hz                                         6.4e+10 [spec]
+  fcc15255.radar_uav_60_64#band_low_hz                                            6e+10 [spec]
+  fcc15255.radar_uav_60_64#off_time_min_run_s                                     0.002 [spec]
+  fcc15255.radar_uav_60_64#off_time_sum_min_s                                    0.0165 [spec]
+  fcc15255.radar_uav_60_64#off_time_window_s                                      0.033 [spec]
+  fcc15255.radar_uav_60_64#peak_eirp_dbm                                             20 [spec]
+  ieee80211ay.channel_centres_ghz                                                       [spec]
+  ieee80211ay.channel_centres_ghz[2]                                          6.048e+10 [spec]
+  isolation.tx_rx_tue2018#with_ebg_db                                                40 [spec]
+  isolation.tx_rx_tue2018_no_ebg_min_db                                              20 [derived]
+  itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz=60                              14.651 [derived]
+  jcas60.adc#desense_allowed_db                                                       1 [assumed]
+  jcas60.adc#samples_per_chip                                                         2 [assumed]
+  jcas60.antenna_gain_dbi#rx                                                         10 [assumed]
+  jcas60.antenna_gain_dbi#tx                                                         10 [assumed]
+  jcas60.bistatic_geometry#baseline_m                                                 5 [assumed]
+  jcas60.bistatic_geometry#r_rx_m                                                     5 [assumed]
+  jcas60.bistatic_geometry#r_tx_m                                                     5 [assumed]
+  jcas60.channel#number                                                               2 [assumed]
+  jcas60.channel#width_hz                                                      2.16e+09 [assumed]
+  jcas60.comm_limit_kind                                                                [assumed]
+  jcas60.compression_margin_db                                                       10 [assumed]
+  jcas60.detection#pd                                                               0.9 [assumed]
+  jcas60.doppler_window                                                                 [assumed]
+  jcas60.leakage_delay_s                                                          1e-10 [assumed]
+  jcas60.oxygen_frequency_ghz                                                        60 [assumed]
+  jcas60.packet_overhead#sifs_per_packet                                              1 [assumed]
+  jcas60.rx_gain_db                                                                  40 [assumed]
+  jcas60.sensing_burst#frames_per_s                                                  30 [assumed]
+  jcas60.sensing_burst#interval_s                                                0.0001 [assumed]
+  jcas60.sensing_burst#n_packets                                                     64 [assumed]
+  jcas60.sensing_packet#data_blocks                                                   0 [assumed]
+  jcas60.sensing_packet#fields                                                          [assumed]
+  jcas60.sim#buffer_chips                                                               [assumed]
+  jcas60.sim#cfar_guard                                                                 [assumed]
+  jcas60.sim#cfar_train                                                                 [assumed]
+  jcas60.sim#exclude_doppler_bins                                                       [assumed]
+  jcas60.sim#exclude_range_lags                                                         [assumed]
+  jcas60.sim#frames_averaged                                                            [assumed]
+  jcas60.sim#seed                                                                       [assumed]
+  jcas60.target#range_m                                                               5 [assumed]
+  jcas60.target#velocity_mps                                                          2 [assumed]
+  rx60.comm_asada2011#antenna_gain_dbi                                                2 [spec]
+  rx60.comm_asada2011#nf_db                                                         6.1 [spec]
+  rx60.comm_asada2011#tx_p1db_dbm                                                   5.4 [spec]
+  rx60.radar_iwr6843#nf_db                                                           12 [spec]
+  rx60.radar_iwr6843#tx_power_dbm                                                    12 [spec]
+  rx60.radar_iwr6843_fig7_2#gain_db                                                     [spec]
+  rx60.radar_iwr6843_fig7_2#nf_db                                                       [spec]
+  rx60.radar_iwr6843_fig7_2#p1db_inband_dbm                                             [spec]
+  rx60.radar_iwr6843_fig7_2#p1db_inband_dbm@gain_db=40                              -34 [spec]
+  target_rcs.deep2019_pedestrian_77g#co_pol_max_dbsm                                  5 [spec]
+  target_rcs.deep2019_pedestrian_77g#co_pol_min_dbsm                                -10 [spec]
+  tgad_em.pn_params#f_pole_hz                                                     1e+06 [spec]
+  tgad_em.pn_params#f_zero_hz                                                     1e+08 [spec]
+  tgad_em.pn_params#psd0_dbchz                                                      -90 [spec]
+  row A: fmcw_radar@fb0fc16 `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)

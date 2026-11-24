@@ -1,0 +1,659 @@
+# Vendored from mmw60_trx@cfb401aae3d4271f1ed1146f8c1f182065b26fe7: src/mmw60/data/spec/survey.yaml
+# Adapted-copy policy: see src/jcas60/vendor/__init__.py
+# 本库自己的数字表（铁律 5）—— 本库的取舍（assumed）、本库的产出（derived）与 3 条留下的 survey。
+#
+# 关于外部世界的数（规范条文、论文与数据手册的数字、只由它们推出的 derived）自 2026-11-13 起
+# 在共享库 spec_sources 里，按完整 SHA vendor 在 src/mmw60/vendor/spec_sources/data/*.yaml
+# （mmw60_trx#21；PIN 见 src/mmw60/vendor/__init__.py）。mmw60.spec 把两张表合起来读，同一个键
+# 出现两次直接报错。本文件只留本库的东西：
+#
+#   assumed  原文根本没说、本库自己定的数；note 写明为什么这样取、换了会动什么。
+#   derived  用到本库的 assumed 或本库示例读数推出来的数；cite 写推导式。
+#   survey   未核实的数里不进共享库的 3 条（值是本库仓库里的文件名，或姊妹库的综合估计）；
+#            note 必须写“未核实”。
+#   （第四个标签“规范原文”只在共享表里出现：本文件没有这一类。）
+#
+# 每张表每个标签都按 grep 计数核对（tests/test_spec_sources.py），所以文件头与注释里不写
+# “标签词 + 冒号”的字串。任何代码都不得直接写这些数字：只能通过 mmw60.spec.survey(key) /
+# value(key) 按 key 取，并把 source 一起带到结果里。
+
+entries:
+
+  # ------------------------------------------------------------ 本库自己定的（原文没说）
+  # Liu 2025、11ad 评估方法学、规管、802.11 的条目在 vendored spec_sources 的 data/liu2025.yaml、
+  # data/ieee80211.yaml、data/regulatory.yaml；Liu 引的 [15]（802.15.3c 的相噪与 PA 模型）在 data/ieee802153c.yaml。
+  assumed.base_bandwidth_hz:
+    value: 20.0e+6
+    unit: Hz
+    source: assumed
+    cite: "本库"
+    note: "Liu 2025 未说基准带宽；取 VHT 20 MHz（64 点 FFT、56 有效音 = 52 数据 + 4 导频）。换 40/80 MHz 基准只改 N_SD 与交织表，PER–SNR 曲线在 AWGN 样信道上几乎不动。"
+
+  assumed.snr_definition:
+    value: "in-band per-active-subcarrier Es/N0"
+    unit: text
+    source: assumed
+    cite: "本库"
+    note: "Liu 2025 未定义 SNR。本库按每有效子载波 Es/N0 加噪；每样本口径（全采样带宽）与之差 10·log10(os·N_FFT/N_active)，64 点 / 56 音 / os=2 时为 3.6 dB，示例两种口径都打印。"
+
+  assumed.pn_apply_sides:
+    value: "both"
+    unit: text
+    source: assumed
+    cite: "本库"
+    note: "Liu 2025 未说相噪加在哪一侧。本库 TX、RX 各一份独立实现、同一 PSD（总相噪功率 +3 dB）；示例给 rx-only 灵敏度行。2026-11-13（mmw60_trx#25）：TGad 评估方法学原文就是两侧各加一份（tgad_em.pn_sides，spec），Liu 用的正是它的相噪模型形状，本库的取法与之一致；仍是本库的取舍，因为 Liu 本人没说。更正（2026-11-15，spec_sources#26）：Liu 刊出版的相噪模型引的是 [15] IEEE 802.15-06-0477（tg3c.pn_model），不是 TGad；两者同形（1 极 1 零），[15] 提出的 PSD(0) 是 −87 dBc/Hz，Liu 的 −93 是它的示例档之一（tg3c.pn_psd0_examples_dbchz）。"
+
+  assumed.cr_rms_delay_ns:
+    value: 7.0
+    unit: ns
+    source: assumed
+    cite: "本库；由 Fig. 4 的可观测事实反推（见 derived.isi_beyond_gi_k16_db），量级与 Maltsev et al., IEEE 802.11-09/0334r8 (CR, LOS) 的记忆不矛盾"
+    note: "CR tap 表没有；用 wifitrx TDLChannel 指数 PDP、每包一个 Rayleigh 实现代替。Fig. 4 里 16× 在每个 MCS 上都不比 8× 差，而 16× 的 GI 只有 50 ns，所以原文信道落在 50 ns 之外的能量必须可忽略；指数 PDP 要满足 exp(−50 ns/τ) ≤ −30 dB 需 τ ≤ 7.2 ns，取 7 ns。第一版取 15 ns 时 K=16 的 ISI 底板 −14 dB，直接与 Fig. 4 矛盾（cairn/LOG.md 2026-11-06）。Fig. 4 曲线从 PER 1 到 1e-3 只跨约 3 dB，说明原文信道对每包近乎无衰落，所以示例另跑 flat 行并报两者之差。"
+
+  assumed.cr_los_k_db:
+    value: 10.0
+    unit: dB
+    source: assumed
+    cite: "本库；CR LOS 场景的直射分量相对全部散射分量的功率比"
+    note: "Fig. 4 曲线从 PER 1 到 1e-3 只跨约 3 dB（AWGN 样），纯 Rayleigh 指数 PDP 在 160 MHz 带宽内频选衰落会把曲线拉平、整体右移；LOS 占优（K = 10 dB）把每音衰落深度限制在约 ±3 dB。示例给 Rayleigh（K = None）与 flat 两个灵敏度行。"
+
+  assumed.ce_smooth_tones:
+    value: 3
+    unit: tones
+    source: assumed
+    cite: "本库；wifitrx preamble.smooth_channel_estimate"
+    note: "L-LTF 只有两段，原始信道估计的噪声是数据噪声的一半，低 SNR 下折合约 1.8 dB 损失；标准接收机都做频域平滑（MATLAB wlanVHTLTFChannelEstimate 默认 span 3 的记忆）。取 3 音；示例给 1 音（不平滑）灵敏度行。"
+
+  assumed.pa_obo_reference:
+    value: "psat"
+    unit: text
+    source: assumed
+    cite: "本库"
+    note: "Liu 2025 只说 'OBO 8 dB'。字面 OBO 是相对饱和输出功率 Psat；但 11ad EM 的 CMOS Rapp（p = 0.81）P1dB 在 Psat 以下 9.5 dB（tgad_em.rapp_p1db_below_psat_db），相对 Psat 回退 8 dB 等于平均功率在 P1dB 之上 1.5 dB，孤立 EVM 只有 −17 dB。主结果按字面 psat；示例另给 p1db 口径的灵敏度行。2026-11-13（mmw60_trx#25）：TGad 评估方法学原文把回退定义为相对饱和输出功率（tgad_em.pa_backoff_definition，spec），并推荐 OFDM 8 dB（tgad_em.pa_backoff_recommended_db）——psat 口径与 Liu 的 8 dB 都有了出处；仍是本库的取舍，因为 Liu 本人没说参考点。2026-11-15（spec_sources#26）：Liu 的 PA 模型引的 [15] IEEE 802.15-06-0477 只给修正 Rapp 的公式、不给参数，回退也是相对 Psat 的输出回退（tg3c.pa_modified_rapp_shape 的 note，转引 802.11n IM1）。"
+
+  assumed.rx_timing:
+    value: "genie (frame start known)"
+    unit: text
+    source: assumed
+    cite: "本库"
+    note: "沿用 wifitrx 的做法（cal/sequence.score_views 对已知波形互相关）。包检测 / 符号定时误差不在里程碑 0 的 PER 里。"
+
+  assumed.ppdu_fields_modelled:
+    value: "L-STF (10 x 0.8 us), L-LTF (GI2 + 2 x 3.2 us), Data; L-SIG / VHT-SIG-A / VHT-STF / VHT-LTF / VHT-SIG-B omitted"
+    unit: text
+    source: assumed
+    cite: "本库"
+    note: "SIG 字段用 BPSK 1/2（≤ MCS0 的鲁棒性），对数据域 PER 结论无影响；VHT-LTF 与 L-LTF 在 1 流 20 MHz 上信道估计等价。导频值用 wifitrx 的伪随机 BPSK 序列（pilot_sequence seed 42）而非 11ac 的极性序列，对 CPE 跟踪等价。"
+
+  assumed.scrambler_seed:
+    value: 93
+    unit: 7-bit integer
+    source: assumed
+    cite: "本库（与 MATLAB WLAN Toolbox 默认 93 相同）"
+    note: "扰码初态对 PER 无影响。"
+
+  # ------------------------------------------------------------ 推导
+  derived.isi_beyond_gi_k16_db:
+    value: -31.0
+    unit: dB
+    source: derived
+    cite: "10·log10(exp(−T_GI(K=16) / τ_rms)) = 10·log10(exp(−50 ns / 7 ns))"
+    note: "指数 PDP 在 K = 16 的 GI（0.8 µs / 16 = 50 ns）之外的能量份额；选 τ_rms 使它 ≤ −30 dB。"
+
+  # ------------------------------------------------------------ 里程碑 1 拓扑 B：前端
+  survey.dsp_ip_dpd_poly_p4:
+    value: {ddr_r1_w16: {terms: 140, area_mm2: 8.026, f_clk_mhz: 682}, gmp510_w16: {terms: 255, area_mm2: 14.173, f_clk_mhz: 682}}
+    unit: NanGate45 estimate
+    source: survey
+    cite: "alexyudragonsword-collab/dsp_ip@2887659e339c67c3819a27ac3da8e28ea93857f8 docs/results.md 'Parallelism × frequency × area', P = 4 rows"
+    note: "未核实（姊妹库综合估计，yosys+OpenROAD，无功耗数）；2727 MSPS = 682 MHz × 4。"
+
+  assumed.converter_enob_ref:
+    value: 10.0
+    unit: bit
+    source: assumed
+    cite: "本库"
+    note: "1 GS/s 处的 ENOB 参考点（WiFi 7 芯片 12 bit DAC / 11 bit ADC 在 ≤ 1.28 GS/s 的量级）；K 倍速率按 assumed.converter_bits_per_octave 递减。"
+
+  assumed.converter_bits_per_octave:
+    value: 0.5
+    unit: bit/octave
+    source: assumed
+    cite: "本库；趋势量级参考 Murmann ADC survey 的 Schreier FoM 包络（SNDR 每倍频 −3 dB）"
+    note: "常数 Schreier FoM 下 ENOB 每倍采样率降 0.5 bit；常数 Walden FoM、恒功率下是 1 bit/octave（悲观端，示例 02 灵敏度）。"
+
+  assumed.converter_backoff_db:
+    value: 12.0
+    unit: dB
+    source: assumed
+    cite: "本库；与 wifitrx RxParams.adc_backoff_db 相同"
+    note: "OFDM rms 低于转换器满量程的余量（PAPR）。"
+
+  assumed.pa60_psat_dbm:
+    value: 15.0
+    unit: dBm
+    source: assumed
+    cite: "本库；60 GHz CMOS PA 单路 Psat 的量级"
+    note: "只影响绝对功率 / EIRP 列，不影响 OBO 固定时的 EVM。2026-11-12 对照读过原文的测量值：同组 65 nm 的三颗 PA 是 14.6 / 13.2 / 11.7 dBm，pa60.eumc2011_table1 汇编的 14 颗是 8–19.9 dBm（中位 12.45）。15 dBm 在这个范围里，量级没有问题；偏离测量值的是 Rapp 的形状（tgad_em.pa_rapp_p），不是 Psat。2026-11-12 起预设改用测量的 PA（assumed.pa60_surveyed_pick），这条只由 config.tgad_em_pa 读（灵敏度行：旧的 PA）。"
+
+  assumed.pa60_gain_db:
+    value: 20.0
+    unit: dB
+    source: assumed
+    cite: "本库"
+    note: "同上。2026-11-12 起预设改用测量的 23.2 dB（pa60.asada_eumc2011），这条只由 config.tgad_em_pa 读。"
+
+  assumed.lo_leak_dbc:
+    value: -30.0
+    unit: dBc
+    source: assumed
+    cite: "本库；wifitrx TxParams.randomize 的 −32…−22 dBm 泄漏对 ~−10 dBm 调制器信号即 −22…−12 dBc，60 GHz 取校准前 −30 dBc"
+    note: "零中频下落在 DC，CFO 纠正后偏到 2.94 MHz / SCS_eff 个子载波处。"
+
+  assumed.rx_dc_dbc:
+    value: -25.0
+    unit: dBc
+    source: assumed
+    cite: "本库"
+    note: "RX 自混频直流相对基带信号。是混频器输出处的一个绝对电平：按基带信号标称 −20 dBm 折算（frontend.rx_params，各档按 wifitrx 梯子的比例），不随接收前端的增益走。所以 2026-11-18 预设换成 60 GHz 接收前端（增益 27 dB，比 WiFi 7 梯子低 10 dB，ROADMAP C9）之后，同一个输入电平上这份直流相对信号高了约 8 dB：不做数字去直流、CFO 把它搬到数据音上时，EVM −30.2 → −21.8 dB（K = 8，无噪声，tests/test_frontend.py）。预设开着数字去直流，两种前端下都回到 −39.8 dB，SNR 10 dB 上都是 −9.24 dB，所以预设的数不受它影响。自混频直流该不该随前端增益缩放（从 LNA 输入漏进来的那部分随增益，直接漏到混频器的不随），没有出处。"
+
+  assumed.iq_mismatch:
+    value: {gain_db: 0.25, phase_deg: 1.5, gd_mismatch_ps: 150, rail_ripple_db: 0.3, rail_gd_ripple_ns: 0.12}
+    unit: wifitrx FreqDepIQImbalance
+    source: assumed
+    cite: "本库；wifitrx TxParams.randomize 各范围的中点"
+    note: "绝对单位（ps、ns）：同一个器件在 K 倍带宽上的频率相关 IQ 不平衡随之变差，这是物理。"
+
+  assumed.mcs_evm_margin_db:
+    value: 3.0
+    unit: dB
+    source: assumed
+    cite: "本库"
+    note: "网格判定'能'的口径：损伤 EVM 底板要低于该 MCS 的 TX EVM 要求（wifitrx link/mcs.py tx_evm_limit_db）3 dB，给热噪声留余量。"
+
+  assumed.dpd_rate_over_bw:
+    value: 4.0
+    unit: ratio
+    source: assumed
+    cite: "本库；dsp_ip dpd_poly 的目标 640 MSPS 对应 160 MHz（4×）"
+    note: "DPD 数据通路采样率 = 4 × 信道带宽（5 阶预失真展宽）。"
+
+  assumed.irr_after_cal_db:
+    value: 45.0
+    unit: dB
+    source: assumed
+    cite: "本库；wifitrx tx_iq / rx_iq 步骤的验收 spec 是 irr_db ≥ 50 dB（320 MHz），留 5 dB"
+    note: "网格的'IQ 校准后'列用的每侧残余镜像抑制；示例 03 在每个 K 上实测校准后的 IRR，对不上时以实测为准。"
+
+  # ------------------------------------------------------------ 里程碑 1 A3：同台表与 pJ/bit
+  assumed.dsp_word_bits:
+    value: 16
+    unit: bit
+    source: assumed
+    cite: "本库；dsp_ip dpd_poly 的 w16 变体"
+    note: "数字块（DPD、FFT、Viterbi 路径度量）的运算字宽；乘法能耗 ∝ 宽度²、加法 ∝ 宽度。"
+
+  assumed.pa60_pae_max:
+    value: 0.20
+    unit: ratio
+    source: assumed
+    cite: "本库；60 GHz CMOS PA 在 Psat 处 PAE 的常见量级"
+    note: "2026-11-12 对照：读过原文的峰值 PAE 16.3 / 15.0 / 14.3 %，Table I 汇编的 4.9–16.3 %；20 % 偏高。同日起预设改用测量的 16.3 %，这条只由 config.tgad_em_pa 读。只进 pJ/bit 列。回退下的 PAE 按 B 类规律 PAE(Pout) = PAE_max · sqrt(Pout / Psat)（frontend/pa.py），OBO 8 dB 处 7.9 %；换成 A 类（∝ Pout/Psat）PA 项再差 2.5 倍。未查具体器件。"
+
+  assumed.lo_multiplier_law:
+    value: "integer_n"
+    unit: law
+    source: assumed
+    cite: "本库 impairments/phase_noise.py::profile_at_carrier；pll_simulator#71（d67043e 落地）"
+    note: "pllsim 剖面怎么到 LO 频率（零中频是载频，拓扑 A 是 f_c − f_IF，2026-11-14 起）：只接受整数的 f_LO / f0。带倍频器的文件（pllsim export --multiply-by N，f_in/2 以内 N²·S + 底噪，以上只有底噪）只在自己的 f0 上原样使用，不再平移；不带倍频器的文件按理想规律 20·log10(N) 平移，没有底噪项。非整数比（原先 6.253 GHz 到 60.48 GHz 的 ×9.672）与分频一律报错。更正（2026-11-11）：原先的值是 '20log10'，对任意比值都平移，那一行不对应可实现的倍频器，已由 ×10 剖面替换。"
+
+  assumed.lo_multiplier_floor_dbchz:
+    value: -150.0
+    unit: dBc/Hz
+    source: assumed
+    cite: "本库；倍频器输出端的加性相噪底，未查具体器件（pll_simulator ex22 的 −160 dBc/Hz 是对方的占位，没有出处）"
+    note: "pllsim ×10 剖面的底噪参数。PLL 远端 ×10² 在 100 MHz 处 L(f) 约 −133.6 dBc/Hz，−150 与 −160 都埋在它下面（100 MHz 处 −150 比 −160 高 0.09 dB）；−140 / −130 比 −160 高 0.9 / 5.1 dB。示例 04 第 5 节有 −160 / −140 / −130 三档灵敏度行，每档一个入库的剖面文件。"
+
+  assumed.lo_multiplier_spur_rejection_db:
+    value: 40.0
+    unit: dB
+    source: assumed
+    cite: "本库；倍频器对非选中谐波的抑制，未查具体器件（pll_simulator ex22 的占位值）"
+    note: "只写进剖面文件的杂散表，引擎不消费：本库是线性化基带引擎，杂散结论不能背书（铁律 6）。4 MHz 小数杂散 ×10 后 −43.7 dBc 同样只在文件里。"
+
+  assumed.pll60_power_mw:
+    value: 40.0
+    unit: mW
+    source: assumed
+    cite: "本库；60 GHz CMOS 频综（PLL + 倍频 + LO 缓冲）的功耗量级"
+    note: "只进 pJ/bit 列，按定值计入每条 60 GHz 行（TX、RX 各一份）；未查具体器件，灵敏度节 ×0.5 / ×2。"
+
+  assumed.pll_sub7_power_mw:
+    value: 20.0
+    unit: mW
+    source: assumed
+    cite: "本库；sub-7 GHz WiFi 频综的功耗量级"
+    note: "只进 pJ/bit 列的 K = 1 行；未查具体器件，灵敏度节 ×0.5 / ×2。"
+
+  survey.clock_profile_wu19:
+    value: {file: "bench_wu19_spll_frac_52m_6p253g.yaml", f0_hz: 6.2530156e+9}
+    unit: pllsim clock profile
+    source: survey
+    cite: "Halo_Serdes@13ef8438ab82c9d364ff24c591da33d64afbe598 data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml（pllsim 0.9.6 commit 67fe1c72 的 bench 预设输出；Wu 2019 JSSC 亚采样小数 PLL 6.253 GHz）"
+    note: "未核实（姊妹库模型输出，不是实测）：不带倍频器的原始剖面，文件原样复制到 src/mmw60/data/clock_profiles/。更正（2026-11-11）：同台表不再用它（到 60.48 GHz 是 ×9.672，非整数，现在报错）；只留给理想 ×N 规律的测试（整数倍）。"
+
+  survey.clock_profile_wu19_x10:
+    value: {file: "pllsim_wu19_x10_60p48g_floor150.yaml", f0_hz: 60.48e+9, f_in_hz: 6.048e+9, multiply_by: 10, sensitivity_files: ["pllsim_wu19_x10_60p48g_floor160.yaml", "pllsim_wu19_x10_60p48g_floor140.yaml", "pllsim_wu19_x10_60p48g_floor130.yaml"]}
+    unit: pllsim clock profile
+    source: survey
+    cite: "pll_simulator@d67043e1197692dc203287b437613f7b9db83bb7：pllsim export bench_wu19_spll_frac_52m_6p253g --set fout=6.048G --set osc.f0=6.048G --clock-profile <file> --multiply-by 10 --floor-dbchz=<F> --spur-rejection-db 40（F = −150，灵敏度 −160 / −140 / −130）"
+    note: "未核实（姊妹库模型输出，不是实测）：Wu 2019 预设重调到 6.048 GHz 再过对方的 ×10 倍频器模型，510 点到 30.24 GHz。本库在本地检出的该 commit 上生成（对方 examples/out/ 不入库）；底噪与抑制度是 assumed.lo_multiplier_floor_dbchz / assumed.lo_multiplier_spur_rejection_db。同台表 'LO = pllsim wu19 x10' 各行用它。只用于零中频（拓扑 B，LO 在载频上）；拓扑 A 的固定 LO 在 54.0 GHz，用 survey.clock_profile_wu19_x9。"
+
+  survey.clock_profile_wu19_x9:
+    value: {file: "pllsim_wu19_x9_54p0g_floor150.yaml", f0_hz: 54.0e+9, f_in_hz: 6.0e+9, multiply_by: 9}
+    unit: pllsim clock profile
+    source: survey
+    cite: "pll_simulator@d67043e1197692dc203287b437613f7b9db83bb7：pllsim export bench_wu19_spll_frac_52m_6p253g --set fout=6.0G --set osc.f0=6.0G --clock-profile <file> --multiply-by 9 --floor-dbchz=-150 --spur-rejection-db 40"
+    note: "未核实（姊妹库模型输出，不是实测）：与 survey.clock_profile_wu19_x10 同一个预设、同一个 commit，重调到 6.0 GHz 再过 ×9，507 点到 27 GHz；IPN（10 kHz–100 MHz）−34.0 dBc。拓扑 A 的固定 LO（f_c − f_IF = 54.0 GHz，lo.scheme fixed_lo_x9）用它；×3 / ×4 的 PLL（18.0 / 13.5 GHz）超出对方模型的 12 GHz 覆盖范围（pll_simulator#71），所以 pllsim 行用 ×9。倍频器底噪只生成 −150 一档：底噪四档的灵敏度在 ×10 行上已经量过（埋在 PLL 远端 N²·S 下面）。"
+
+  assumed.array_geometry:
+    value: {layout: "linear", spacing_lambda: 0.5, element_pattern: "cos"}
+    unit: geometry
+    source: assumed
+    cite: "本库 config.array_frontend；arraytx ArrayGeometry（element_pattern 是场幅度因子：isotropic 或 cos θ）"
+    note: "里程碑 2 的阵列：每端一排 N 个单元（n × 1，扫描面沿 x），间距半波长（60.48 GHz 上 2.48 mm）。单元方向图取 arraytx 的 cos θ（场幅度），扫描到 45° 损失 3 dB、60° 损失 6 dB；单元的视轴增益用共享前端的 antenna_gain_dbi（预设 0 dBi，即未指定）。没有查具体的 60 GHz 天线阵；示例 10 有 isotropic 的灵敏度行。"
+
+  assumed.array_phase_bits:
+    value: 3
+    unit: bit
+    source: assumed
+    cite: "本库 config.array_frontend；frontend/array60.py::quantise_phase"
+    note: "移相器分辨率，以第一个单元为相位参考、四舍五入。扫描角平均的量化损失（N = 64）4 / 3 / 2 / 1 bit 为 0.05 / 0.22 / 0.88 / 3.81 dB，与 sinc(π/2^B) 理论 0.06 / 0.22 / 0.91 / 3.92 dB 相符。没有查具体器件；示例 10 有各 bit 数与连续相位的灵敏度行。"
+
+  assumed.array_element_errors:
+    value: {gain_db_rms: 0.5, phase_deg_rms: 5.0}
+    unit: 1 sigma
+    source: assumed
+    cite: "array_tx@286609e config.py::ElementErrorsCfg 的默认值（它自己的取值，没有外部出处；本库不 vendor 这个文件，两个数与 @5815c5a 相同）"
+    note: "每个单元一次抽取的静态增益 / 相位误差（error_seed），校准后的残差量级。阵列只在束向上损失一点增益、旁瓣抬高；示例 10 有不加误差的灵敏度行。"
+
+  assumed.array_codebook:
+    value: {scan_max_deg: 60.0, sector_oversampling: 1.0}
+    unit: codebook
+    source: assumed
+    cite: "本库 frontend/array60.py::Array60.codebook_deg"
+    note: "训练码本：扇区在 sin θ 上均匀分布于 ±60°，个数 = 阵列列数 × 过采样（1 = 每个波束宽度约一个）。示例 10 有过采样 2 的灵敏度行。"
+
+  assumed.array_training:
+    value: {field: "GI2 + 2 L-LTF symbols of the base PHY, upclocked", estimator: "noncoherent_tones", success_within_db: 1.0, p_target: 0.99, timing: "mlo", sector_switch_s: 1.0e-7}
+    unit: procedure
+    source: assumed
+    cite: "本库 arraylink.py（MLO 触发的扇区扫描，用户 2026-11-14 选定）"
+    note: "802.11be 没有毫米波波束训练，按 MLO 触发来算：sub-7 链路排定扫描时刻（定时已知，不靠 L-STF 检测），60 GHz 上每个扇区发一段升频后的基准 L-LTF（GI2 + 2 个符号），先 TX 扫（对端单个单元接收）、再 RX 扫。接收端按已知 LTF 逐音做两符号相干、跨音非相干累加估功率，取最大；选到的扇区增益与最佳差 1 dB 以内算成功，要求 99 %。扇区切换 100 ns 是假设。示例 10 有跨音相干累加与“必须选中最佳扇区”两行灵敏度。“MLO 触发”这一选择有出处：Liu 2025 刊出版 p. 72 的原话（liu2025.mlo_bf_training_statement，spec；2026-11-15 读，spec_sources#26 收）；训练场、估计器与门限仍是本库的。平坦信道（视距），不建多径下的扇区选择；氧吸收（60 GHz 约 15 dB/km）在 20 m 内不到 0.3 dB，不计。更正（2026-11-14）：N ≥ 16 的距离到了百米、千米，氧吸收不能不计，另立 assumed.oxygen_absorption，距离按它算（路径损耗不含它）。"
+
+  assumed.array_phase_shifter_power_mw:
+    value: 15.0
+    unit: mW
+    source: assumed
+    cite: "本库 arraylink.py::array_power_report；用户 2026-11-15 选定阵列功率计 PA × N 与每单元一个移相器"
+    note: "每个单元每一侧一个移相器（TX 阵 N_tx 个、RX 阵 N_rx 个），没有查具体器件：取 60 GHz CMOS 有源移相器（带增益补偿）的功耗量级；无源反射型自身近 0，但要多一级放大补插损。N = 1 不计（那个单元就是前端自己）。LNA / 混频与单元件口径一样不计，1:N 分路与 N:1 合路的插损由前后级增益补，不另计。只进阵列行的 pJ/bit；示例 10 §3c 有 0 / 30 mW 的灵敏度列。"
+
+  assumed.array_training_repetition:
+    value: {combining: "noncoherent", max_repetitions: 256}
+    unit: procedure
+    source: assumed
+    cite: "本库 arraylink.py::required_training_snr_db(repetitions=)、repetitions_to_reach；用户 2026-11-15 选定重复 L-LTF、非相干累加"
+    note: "TX 扫够不到 MCS0 的边时，每个扇区把训练场（GI2 + 2 个 L-LTF 符号）重复 R 次，跨重复按功率非相干累加：统计量仍是闭式的非中心卡方（自由度 ×R），不怕 CFO 残差与重复之间的相位漂移，代价是 TX 扫的时长 ×R。R 取 2 的幂，取 TX 扫的路径损耗不小于 MCS0 数据链路的最小 R（上限 256）。跨重复相干累加（每倍少要 3 dB 而不是约 1.5 dB，但要求重复之间相位稳定）是示例 10 §4b 的灵敏度列，算乐观上界。"
+
+  assumed.oxygen_absorption:
+    value: 15.0
+    unit: dB/km
+    source: assumed
+    cite: "本库 arraylink.py::path_loss_db / range_m；估算值，没有查原文（ITU-R P.676 未核对）"
+    note: "60 GHz 附近海平面氧吸收峰的常用整数估算，按载频不变用在所有载频上：它是峰值，57 / 66 GHz 两侧更小，偏离 60 GHz 的载频上偏保守（73.44 GHz 远在吸收带外，这个数不适用；示例 10 只在 60.48 GHz 上用它）。只进距离，不进路径损耗：阵列层的结论以路径损耗为准。示例 10 §3b 有 0 / 10 / 20 dB/km 的灵敏度行。原文（ITU-R P.676，经 spec_sources）待补：用户 2026-11-14 定先用估算、不开 issue，记 ROADMAP B。"
+
+  assumed.cal_capture_symbols:
+    value: 8
+    unit: OFDM symbols
+    source: assumed
+    cite: "本库 calcheck.py；wifitrx 校准序列每次采集的长度，按符号数给"
+    note: "示例 03 / 06 的每一列都用 8 个符号，所以采集的样本数随基准 FFT 点数变：11ac 20 MHz 基准（64 点）只有 1280 个样本，11be 80 MHz 基准（1024 点）有 17408 个。K = 32 的 640 MHz 列（52 音、10 MHz 音距）上 8 个符号不够 GMP 拟合：DPD 步一轮都没写入，仅发 EVM −22.8 dB，与不开 DPD 相同；32 个符号 −29.0 dB。示例 03 有 32 符号的灵敏度行。更正（2026-11-14）：上面“8 个符号不够”的读数只是 seed 0 一组训练数据；换 24 组，写入比例 K = 32 是 2/24 对 6/24（8 / 32 个符号），K = 1 是 5/24 对 6/24，平均增益都在 0.5 dB 以下、中位 0，长度不是决定因素（示例 03 灵敏度节）。"
+
+  assumed.pa_memory_model:
+    value: "wifitrx_reference_pa"
+    unit: model
+    source: assumed
+    cite: "本库 pamemory.py；wifitrx 的 ReferencePA（PA_DPD 的参考 PA：3 抽头输入 FIR → Saleh → 2 抽头输出 FIR），按本库前端的小信号增益 / Psat / 峰值 PAE 定标"
+    note: "只用于 PA 记忆的灵敏度研究（示例 07）：一颗带电记忆的 PA 放进拓扑 B 的链路。它是 sub-7 GHz WiFi PA 的参考模型，不是 60 GHz 器件的测量；非线性（Saleh）也与预设的 modified Rapp 不同，所以表里只在同一颗参考 PA 的两种记忆规律之间读差值。预设与同台表仍是无记忆的 Rapp。"
+
+  assumed.pa_memory_fir_fs_hz:
+    value: 80.0e+6
+    unit: Hz
+    source: assumed
+    cite: "本库；参考 PA 的记忆抽头按 80 MS/s 定义，即 12.5 ns 一个抽头（它作为 WiFi PA 在 20 MHz × 4 倍过采样下的原样）"
+    note: "“记忆按秒固定”一端的抽头间隔：sub-7 GHz PA 的时间常数原样搬到 60 GHz，偏悲观。示例 07 有 320 MHz / 1.28 GHz（3.125 / 0.78 ns）两档灵敏度行，另一端是“记忆随信号缩放”（抽头永远隔一个样本）。fs_eff / fir_fs 必须是正整数（wifitrx 拒绝分数比）。未查 60 GHz PA 的实测记忆时间常数。"
+
+  assumed.pa_memory_fir_fs_sensitivity_hz:
+    value: [320.0e+6, 1.28e+9]
+    unit: Hz
+    source: assumed
+    cite: "本库；assumed.pa_memory_fir_fs_hz 的灵敏度档：抽头 3.125 ns / 0.78 ns"
+    note: "示例 07 末节用：记忆比 WiFi PA 快 4 倍 / 16 倍时，逐样本与匹配抽头间隔的差。都要整除 K = 32 的 5.12 GS/s。"
+
+  assumed.pa_memory_obo_sweep_db:
+    value: [7.0, 7.5, 8.0, 8.5, 9.0, 10.0, 12.0]
+    unit: dB
+    source: assumed
+    cite: "本库；示例 07 的回退扫描格点（自 Psat），含预设的 8 dB"
+    note: "DPD 的收益在 PA 接近饱和时断崖式消失，预设的 8 dB 正好在崖上：随信号缩放的那颗崖在约 7.2 dB，按秒固定的那颗晚 1–2 dB。单点上读 EVM 差读到的主要是崖，所以要扫回退、在同样的 EVM 上比回退。格点在崖附近取 0.5 dB，离开后放宽。"
+
+  assumed.pa_memory_obo_sweep_coarse_db:
+    value: [7.0, 8.0, 9.0, 10.0, 12.0]
+    unit: dB
+    source: assumed
+    cite: "本库；示例 07 末节（记忆快慢）用的较粗格点"
+    note: "只为控制示例的运行时间；插值出的回退代价比细格点粗约 ±0.3 dB。"
+
+  assumed.pa_memory_target_evm_db:
+    value: [-25.0, -27.0]
+    unit: dB
+    source: assumed
+    cite: "本库；比较两种记忆规律时取的目标 TX EVM（DPD 之后，标准接收机口径）"
+    note: "−25 dB 约是 11be MCS5–6 的发射 EVM 要求量级，−27 dB 接近本库前端上 DPD 后的地板（约 −28.5 dB）。读法：达到同一个目标各自要退多少，差值就是按秒固定的记忆在输出功率上的代价。"
+
+  assumed.pa_memory_dpd_candidates:
+    value: [2, 4]
+    unit: samples
+    source: assumed
+    cite: "本库；DPD 基函数抽头间隔的候选，另外总是量 1（逐样本）和 fs_eff / fir_fs（匹配）"
+    note: "抽头间隔在链路上量着选，不直接取 fs_eff / fir_fs：预失真器与 PA 之间的发射基带低通带来逐样本的记忆，稀疏基函数表示不了（wifi_trx_cal#5 的实测）。候选只有这几个，没有扫全。"
+
+  # ------------------------------------------------------------ ROADMAP D4：前端的三个面（接收前端、收发隔离、发 / 收天线增益）
+  # 读过原文与只读到摘要的接收前端、隔离度、天线、DMG 条目在 vendored spec_sources 的
+  # data/frontend60.yaml 与 data/ieee80211.yaml（2026-11-13 迁走；那里的文件头记着两轮核对与一条撤回）。
+  assumed.rx_nf_dsb_to_ssb_db:
+    value: 3.0
+    unit: dB
+    source: assumed
+    cite: "本库；示例 08 §2 的单边带一行（mmw60_trx#63）"
+    note: "rx60.comm_iscas2015 的 7.1 dB 是双边带 NF（原文 'double-side-band NF'），而那颗接收机是超外差（RF 先到约 12 GHz 的中频）：单边带的信号进来时，像频带只送噪声，按惯例单边带 NF 约高 3 dB（像频带增益与信号带相同、又没有像频抑制时正好 3 dB）。原文没给单边带 NF，所以示例 08 两行都列：原文的双边带值，和加上这 3 dB 的单边带值。'anchored' 接收前端的基准档取的 rx60.comm_asada2011 是直接变频（I/Q 混频），与本库零中频的链同一类，不受这一条影响。"
+
+  assumed.rx60_ladder_shape:
+    value: "wifitrx_ladder_shifted"
+    unit: model
+    source: assumed
+    cite: "本库 frontend/rxfront.py；wifitrx DEFAULT_LNA_STATES 的八档梯子整体平移；换档电平按 wifitrx chain/agc.py 的平衡点规则"
+    note: "'anchored' 接收前端怎么从最高增益档的 NF / IIP3 / 增益变成 AGC 要的八档表：保留 wifitrx 梯子的增益步进与各档之间的相对关系，每档的 NF、IIP3、增益各加同一个 dB 数。换档电平按 wifitrx 自己的规则走（噪声对 IM3 的平衡点 t_i = (2·IIP3_i + NF_{i+1} + 常数) / 3）：整体平移时每个电平移 (2·ΔIIP3 + ΔNF) / 3，与增益无关；以官方表的电平为基准，所以什么都不给时就是 wifitrx 的梯子。读到的文献只给高 / 低两档增益（27 / 17 dB），其余档位是假设。"
+
+  assumed.rx60_p1db_from_iip3_db:
+    value: 9.6
+    unit: dB
+    source: assumed
+    cite: "本库；三阶非线性的经验关系 IIP3 − P1dB ≈ 9.6 dB"
+    note: "把 IIP3 折成**带内**输入 1 dB 压缩点时用。带外的压缩点（基带高通之前，雷达的泄漏碰到的那个）不能这样折出来，是另一个字段（frontend.rx_front.p1db_oob_dbm），没有出处就留空。真实前端的差值随级数与偏置变，常见 8–12 dB。"
+
+  assumed.frontend_faces_pick:
+    value: {rx_nf_db: 6.1, rx_iip3_dbm: -20.0, rx_gain_db: 27.0, tx_rx_isolation_db: 20.0, antenna_gain_tx_dbi: 2.0, antenna_gain_rx_dbi: 2.0}
+    unit: "dB, dBm, dB, dB, dBi, dBi"
+    source: assumed
+    cite: "本库 config.surveyed_frontend；从上面的条目里各取一个数"
+    note: "'surveyed' 一档取哪几个数是本库的选择：接收 NF / IIP3 / 高增益档增益与发 / 收天线增益都取同一颗通信收发机（rx60.comm_asada2011，读过原文），不取雷达芯片；收发隔离取不加 EBG 的下端 40 − 20 = 20 dB（保守，泄漏最大）。第一版取的天线是 6 dBi（antenna60.okada2013_dbi，至今没有读到原文），读到 Asada 原文后换成它自己的 2 dBi，6 dBi 留作灵敏度档。预设不用这一档，现有数字不动；示例 08 每张表都是灵敏度行。"
+
+  assumed.preset_rx_front:
+    value: {from: "assumed.frontend_faces_pick", fields: [rx_nf_db, rx_iip3_dbm, rx_gain_db], antennas: "assumed.preset_antenna", tx_rx_isolation: "not in the presets (unset)", k1_row_at_6ghz: "wifi7_ladder"}
+    unit: procedure
+    source: assumed
+    cite: "本库 config.surveyed_rx_front / zero_if_60ghz / wifi7_chain_k1 / wifi7_rx_ladder；用户 2026-11-18 定（ROADMAP C9）"
+    note: "60 GHz 预设（zero_if_60ghz，以及建在它上面的 if_extender_60ghz、ay_60ghz）的接收前端取哪几个数：只取 assumed.frontend_faces_pick 里接收机的三个（NF 6.1 dB、IIP3 −20 dBm、高增益档变频增益 27 dB，同一颗 60 GHz 通信收发机 rx60.comm_asada2011，读过原文），梯子其余七档是形状假设（assumed.rx60_ladder_shape）。三个面里的天线同日稍后也进了预设（assumed.preset_antenna，用户定“要进”）；收发隔离仍留空（时分双工链路不消费它），要它用 config.surveyed_frontend。（这一条刚写下时是：“三个面里另外两个不进预设：天线增益仍是 0 dBi（“未指定”，阵列表另有单元方向图），收发隔离仍留空；要这两个用 config.surveyed_frontend。”）同台表的 K = 1 行（wifi7_chain_k1，6 GHz 上原样的 WiFi 7 芯片）不换：那一行的梯子就是芯片自己的 sub-7 梯子，60 GHz 的接收前端不在 6 GHz 芯片前面；所以那一行与 60 GHz 各行的接收前端不是同一个对象，同台表里标出来。拓扑 A 的预设因此在芯片前串上这一级（assumed.ifext_rx_front60），级联 NF 6.10 dB。2026-11-18 之前预设用 wifitrx 的 WiFi 7 梯子（最高增益档 37 dB / NF 3.5 dB / IIP3 −20 dBm；2026-11-14 用户定过不换，2026-11-18 改），那一档现在是 config.wifi7_rx_ladder，作灵敏度行。换过去动的是灵敏度（dB 对 dB，2.6 dB）与全部距离；SNR 轴上的链路 EVM 不动。"
+
+  assumed.preset_antenna:
+    value: {from: "assumed.frontend_faces_pick", field: antenna_gain_tx_dbi, receive: "the same antenna (TDD, antenna_gain_rx_dbi None)", array: "the element gain of every element, on top of the element pattern", k1_row_at_6ghz: "0 dBi (not specified)"}
+    unit: procedure
+    source: assumed
+    cite: "本库 config.surveyed_antenna_gain_dbi / zero_if_60ghz / wifi7_chain_k1 / unspecified_antenna；frontend/array60.py（element_gain_tx_dbi / element_gain_rx_dbi 取共享前端的天线增益）；用户 2026-11-18 定（ROADMAP C9，“要进”）"
+    note: "60 GHz 预设的天线增益取 assumed.frontend_faces_pick 的 antenna_gain_tx_dbi：2 dBi，与接收前端同一颗 60 GHz 通信收发机的封装内天线（rx60.comm_asada2011，读过原文）。收发同一副天线（时分双工），所以接收一侧也是 2 dBi，链路预算上一共 +4 dB。阵列上它是每个单元的增益，叠在单元方向图（assumed.array_geometry 的 cos 因子，束向上归一）之上：N 个单元的 EIRP = 每单元输出 + 2 dBi + 20·log10 N，顶到 40 dBm 上限的单元数从 N > 44 变成 N > 35。这一条怎么并是本库的选择：原文给的是单颗封装内天线的增益，没有说它在阵列里当单元时的增益；单元间距 0.5 λ 时相邻单元的互耦与有效口径会改这个数，没有建。同台表的 K = 1 行（6 GHz 的 WiFi 7 芯片）单独仿真时天线仍是 0 dBi“未指定”：60 GHz 的封装内天线不是 6 GHz 的天线。2026-11-18 之前预设是 0 dBi“未指定”（config.unspecified_antenna，作灵敏度行）。动的是 EIRP（+2 dB，离上限的余量 −2 dB）、能承受的路径损耗（+4 dB）与全部距离；链路 EVM、校准、同台表的 MCS 上限 / 速率 / pJ/bit 不动；阵列上顶到 EIRP 上限后每单元回退更多，底板与解码器上限跟着动。"
+
+  # ------------------------------------------------------------ 60 GHz PA：本库的取舍与工作点（2026-11-12 / 13）
+  # 读过原文的测量值（pa60.*）与平滑度的 derived 在 vendored spec_sources 的 data/pa60.yaml。
+  assumed.pa60_operating_rule:
+    value: {evm_limit: "dmg.tx_evm_db#evm_db@mcs=12", measured_on: "PA alone, OFDM-like Gaussian envelope, equaliser complex gain removed (frontend.grid.pa_isolated_evm_db)"}
+    unit: "reference to a dB limit"
+    source: assumed
+    cite: "本库；读法取自 pa60.wu_isscc2015：读过的 60 GHz 收发机都按'TX EVM 碰到 802.11ad 16-QAM 限值（−21 dB）时的平均输出'给 Pout；限值本身读 dmg.tx_evm_db 的 MCS12（spec，2026-11-16 起）"
+    note: "拓扑 A / B 预设的 PA 工作点：PA 单独在 OFDM 波形上 EVM 刚好到 802.11ad MCS12（π/2-16QAM 3/4）发射 EVM 限值的那个回退。限值经 frontend.grid.operating_rule_evm_limit_db() 从 dmg.tx_evm_db 读（−21 dB）；2026-11-16 之前这里自己写着 −21.0，出处是 pa60.wu_isscc2015 幻灯片上那条线，两者相同，回退与预设都不动（ROADMAP C10 第一条）。没有任何读过的原文给 60 GHz CMOS PA 在 OFDM 上的工作点（唯一一篇可能给的 MDPI 22 nm 那篇对脚本访问返回 403，没有去绕）。选择：(1) 只看 PA 单独，不看整条发射链——同台表各行共用一个前端实例（铁律 2），整链的 EVM 随 K 变，取整链会让每行的回退不同；(2) 用 802.11ad 16-QAM 的限值而不是 11ac / 11be 某个 MCS 的——这是读到的 60 GHz 发射机共同的额定条件。灵敏度（示例 09）：不算 AM/PM 时回退 7.1 dB；用汇编表中位的形状（Psat − P1dB 3.3 dB）6.7 dB；同一条规则用在 11ad 那颗 Rapp 上是 10.0 dB（Liu 的 8 dB 在那颗上已过 16-QAM 限值）。"
+
+  derived.pa60_obo_at_evm_limit_db:
+    value: 7.5
+    unit: dB from Psat
+    source: derived
+    cite: "frontend.grid.obo_for_isolated_evm(ModifiedRappPA(p=pa60.asada_eumc2011_rapp_p), assumed.pa60_operating_rule.evm_limit_db, 'psat')；Gaussian 包络 32768 点，种子 3 得 7.457，保留一位小数"
+    note: "拓扑 A / B 预设的回退（从 Psat 算），P1dB 之下 2.9 dB，平均输出 14.6 − 7.5 = 7.1 dBm。不同种子 7.46–7.59 dB。tests/test_pa60.py 复算。Liu 的预设（liu2025_table2）仍是 liu2025.pa_obo_db 的 8 dB。"
+
+  assumed.pa60_table1_pae_excluded:
+    value: ["[5]"]
+    unit: "row of pa60.eumc2011_table1"
+    source: assumed
+    cite: "本库；示例 09 §1 的峰值 PAE 一行（mmw60_trx#63）"
+    note: "pa60.eumc2011_table1（Asada EuMC 2011 的汇编表）13 行都由 spec_sources 读过原文（0.6.0）：[5]（Suzuki，ISSCC 2008）原文没有给效率，汇编表那格 5.0 % 找不到出处（同一行的 1.0 V 原文是 1.2 V）。铁律 5：数只用原文，所以示例 09 的峰值 PAE 统计剔掉这一格（中位数 8.5 → 8.8 %），原表的读数作对照照样打印。其余各格与原文一致；[8] 的增益 4.4 与 [14] 的 5.5 和原文另一处的说法（4.2、5.6）不同，但数都在原文里，照表用。"
+
+  assumed.pa60_surveyed_pick:
+    value: {source: "pa60.asada_eumc2011", rapp_p: "pa60.asada_eumc2011_rapp_p"}
+    unit: keys
+    source: assumed
+    cite: "本库 config.surveyed_pa；取一篇读过原文的 60 GHz CMOS PA"
+    note: "取 Asada EuMC 2011 的理由：与接收前端的基准档同一个组、同一个工艺（一套芯片的读法）；读过原文；Psat − P1dB 4.6 dB 在 Table I 里偏软，对线性度是保守的一侧。Psat 14.6 dBm、增益 23.2 dB、峰值 PAE 16.3 % 直接取它；Rapp 的 p 由它的 Psat − P1dB 算出。AM/PM 没有出处，仍是 11ad 评估方法学的。回退量与参考点不在这一档里，由配置决定。2026-11-12 起拓扑 A / B 的预设（zero_if_60ghz 及建在它上面的）用这一档，回退仍是 Liu 的从 Psat 8 dB；Liu 的预设（liu2025_table2）不用。更正（2026-11-13）：预设的回退改由 assumed.pa60_operating_rule 定，从 Psat 7.5 dB（derived.pa60_obo_at_evm_limit_db）；Liu 的预设仍是 8 dB。"
+
+  derived.irr_after_cal_measured_db:
+    value: {20.0e+6: 53.6, 80.0e+6: 53.8, 160.0e+6: 50.5, 320.0e+6: 51.7, 640.0e+6: 46.9, 2560.0e+6: 38.6}
+    unit: dB per side
+    source: derived
+    cite: "examples/expected/03_calibration_at_k.txt（2026-11-18，预设换成 60 GHz 接收前端之后，ROADMAP C9；wifitrx@a8edf50，0.7.46；校准跑在预设的 PA 工作点上——从 Psat 回退 7.5 dB）tx_iq / rx_iq 两步 irr_min_db 的较小值，按有效带宽。2026-11-17 至 11-18（WiFi 7 梯子的预设，同一版 wifitrx）：57.5 / 55.7 / 52.9 / 52.3 / 47.2 / 39.6——换前端后六档低 0.3–3.9 dB：序列经接收机观测，观测通路的 NF 高了 2.6 dB、增益低了 10 dB。2026-11-17 同日 wifitrx@681ce4b（0.7.41，泄漏步把偏置放到 FFT 网格上，wifi_trx_cal#6）：57.5 / 55.7 / 52.9 / 52.3 / 47.2 / 39.4（只有 2.56 GHz 动了：那一列的 DPD 训练捕获以前错位）。2026-11-13 至 11-17（wifitrx@7b8d08e）：57.3 / 55.9 / 53.4 / 51.9 / 48.1 / 40.2。之前跑在 wifitrx 的默认驱动上：2026-11-12（测量的 PA，落在回退 6.9 dB）56.3 / 56.8 / 52.9 / 50.9 / 47.6 / 38.5；换 PA 之前（2026-11-11）55.3 / 55.2 / 50.4 / 51.1 / 46.5 / 37.9"
+    note: "示例 03 实测的校准后镜像抑制；同台表的 'IQcal' 列用它（取不大于该行带宽的最近一档），替代 assumed.irr_after_cal_db（ROADMAP A2 第一条）。示例 02 的网格仍用 45 dB 的假设值。"
+
+  # ------------------------------------------------------------ 里程碑 1 A2：11be 编码 PER（EHT LDPC）
+  assumed.eht_prefec_padding:
+    value: "a=4 (HT/VHT procedure)"
+    unit: rule
+    source: assumed
+    cite: "本库"
+    note: "11be 数据域的预 FEC 填充按 HT/VHT 流程把 SERVICE+PSDU 填到整符号，不做 HE/EHT 的 a 因子（1–4）与 Packet Extension：PER 对此不敏感（只改最后一个符号的有效载荷），吞吐差 < 1 个符号。EHT 的 11 位扰码器也不建（PER 与扰码序列无关，仍用 7 位）。"
+
+  assumed.ldpc_max_iterations:
+    value: 30
+    unit: iterations
+    source: assumed
+    cite: "本库；接收机算法选择"
+    note: "归一化 min-sum 的最大迭代数（综合征为零即提前停止）；30 次在 1944 码上离 50 次的 PER 差 < 0.1 dB 量级，功率列按它计 LDPC 解码能耗。"
+
+  assumed.ldpc_minsum_scale:
+    value: 0.8
+    unit: ratio
+    source: assumed
+    cite: "本库；接收机算法选择"
+    note: "归一化 min-sum 的缩放因子 α；0.75–0.8 是这类码的常用值，LLR 的绝对尺度对 min-sum 无影响。"
+
+  # ------------------------------------------------------------ A3：解码器上限
+  assumed.decoder_cap_margin_db:
+    value: 3.0
+    unit: dB
+    source: assumed
+    cite: "本库"
+    note: "'解码器上限'判定可达的口径：EVM 底板要比该 MCS 的 ideal 门限所容忍的噪声低 3 dB（−floor ≥ T + 3），此时底板吃掉 3.0 dB 灵敏度；取 0 dB 时所需 SNR 发散。同台表灵敏度节跑 1 / 6 dB 两端。与 assumed.mcs_evm_margin_db（发射机合规口径的余量）是两回事。"
+
+  # ------------------------------------------------------------ 拓扑 A：IF 延伸（A1）
+  assumed.ifext_if_hz:
+    value: 6.48e+9
+    unit: Hz
+    source: assumed
+    cite: "本库；6 GHz 频段（5.925–7.125 GHz）里的一个信道中心，使固定 LO 为整 54.0 GHz"
+    note: "拓扑 A 的中频：芯片的信道所在的频率。载频 60.48 GHz 时 f_LO = 54.00 GHz。换信道靠芯片在 6 GHz 段内调 IF，固定 LO 不动（59.925–61.125 GHz 可达）。"
+
+  assumed.ifext_lo_scheme:
+    value: "fixed_lo_x3"
+    unit: scheme
+    source: assumed
+    cite: "本库；60 GHz 常见的 LO 生成方式之一（约 20 GHz 的 PLL 接三倍频）"
+    note: "固定 LO 的倍频数：×3（PLL 18.0 GHz）、×4（13.5 GHz）或 ×9（6.0 GHz）。相噪用参数化的 1 极 1 零剖面直接给在 LO 输出端，所以 N 只进频率规划与 PLL 频率，不改相噪数字。pllsim 剖面（model profile）放在 LO 频率 54.0 GHz 上，不在载频上；对方模型不覆盖 18.0 / 13.5 GHz，所以 pllsim 行是 ×9（survey.clock_profile_wu19_x9），经过倍频器的剖面与 lo.scheme 的倍频数对不上时报错。"
+
+  assumed.ifext_filter:
+    value: {bandwidth_hz: 1.2e+9, order: 5, ripple_db: 0.5, center_hz: 6.525e+9}
+    unit: Chebyshev-I bandpass
+    source: assumed
+    cite: "本库；通带取整个 6 GHz 段（芯片在段内调 IF 换信道），0.5 dB 纹波 5 阶是 LTCC / 声学带通的常见量级，未查具体器件"
+    note: "IF 带通滤波器的低通等效；信道离通带中心越远，带内纹波与群时延展宽越大。示例 06 有信道在通带边缘的灵敏度行。"
+
+  assumed.ifext_image_rejection_db:
+    value: 30.0
+    unit: dB
+    source: assumed
+    cite: "本库；RF 预选滤波对 f_LO − f_IF 镜像带的抑制，未查具体器件"
+    note: "接收侧镜像带的噪声折进信号带：噪声系数恶化 10·log10(1 + 10^(−IRR/10)) = 0.004 dB（30 dB）、0.41 dB（10 dB）。只有拓扑 A 有这一项（零中频没有镜像带），同台表里标出。"
+
+  assumed.ifext_upclock:
+    value: {changes: "digital baseband only", analog: "the chip's native channel K x base bandwidth", channels_from: "ieee80211be.n_sd"}
+    unit: procedure
+    source: assumed
+    cite: "本库 config.if_extender_60ghz(k=…)、Mmw60Config 的校验、compare.scheme_matrix（拓扑 A × be_upclocked；用户 2026-11-15 定：只改数字基带）"
+    note: "拓扑 A 的升频只改数字基带：芯片的 DAC / ADC、模拟低通、6 GHz 射频与它的 14 步校准都是原生信道 K × 基准带宽的那一套（同一颗芯片、同一份校准缓存），数字跑基准 PHY、时钟 ×K。所以 K × 基准带宽必须是芯片有的信道宽度（802.11be 的 20 / 40 / 80 / 160 / 320 MHz，取 ieee80211be.n_sd 的键），320 MHz 以上不做（那要改模拟，等于另一条拓扑）。CFO：前导也跟着升频，L-STF 范围 ±625 kHz × K；MLO 预补偿仍是预设，示例 11 §2 有关掉它的灵敏度行。"
+
+  assumed.ifext_chip_seed:
+    value: 5
+    unit: seed
+    source: assumed
+    cite: "本库；wifitrx handoff/runner.build_calibrated_trx 的默认 seed"
+    note: "拓扑 A 的芯片是 wifitrx 自己随机化损伤后跑完校准序列的收发机（芯片原样）；seed 选哪一颗芯片。示例 06 有换芯片的灵敏度行。"
+
+  assumed.ifext_chip_pa_bypass:
+    value: {tap: "mixer_output", pa_power: "off", coupler: "ahead_of_pa", coupler_atten: "recommended_minus_pa_gain", dpd_step: "off", tx_power_step: "table_only"}
+    unit: procedure
+    source: assumed
+    cite: "本库 ifext.py::calibrated_chip(pa_bypass=True)；wifitrx TxParams.pa_enabled = False"
+    note: "拓扑 A 的芯片 PA 旁路一档（ifext.chip_pa_bypass，预设不开）：IF 从芯片的混频器输出取，芯片 PA 断电、不计功耗。wifitrx 的交付序列在这条链上真跑：校准耦合器跟着移到 PA 前，衰减减去实测的 PA 大信号增益（11be 80 MHz 上 25.6 dB），使芯片接收机看到交付序列调好的电平；DPD 步不跑（芯片上没有要线性化的 PA）；tx_power 步只建表（没有输出可设）。另一种做法——带着 PA 按交付方式校准、链路上再旁路——没有建。原文没有这样的芯片模式，是本库的取舍。"
+
+  assumed.ifext_rx_front60:
+    value: {block: "rx_front_max_gain_state", applies_when: "rx_front_sourced and chip is wifitrx", agc: "chip_ladder", observation_loopback: "past_the_lna"}
+    unit: procedure
+    source: assumed
+    cite: "本库 ifext.py::MmwRxStage（lna_gain_db / lna_nf_db / lna_iip3_dbm）；sim/link.py::LinkSim._rx_nf_db（Friis 级联）"
+    note: "拓扑 A 芯片前的 60 GHz LNA / 下混频：取共享前端 rx_front 的最高增益档（增益、NF、IIP3）当一级固定增益，芯片自己的梯子在后面做 AGC；灵敏度用 Friis 级联 NF。只在 rx_front 是 60 GHz 前端（sourced，如 config.surveyed_frontend）时加：预设的 WiFi 7 梯子就是芯片自己那颗 sub-7 梯子的替身，不重复计，所以预设的数不动。60 GHz 观测回环从混频器进，不过 LNA。60 GHz 段的增益台阶没有建（真实接收机可能有）。（2026-11-18，ROADMAP C9：预设的 rx_front 现在就是 60 GHz 的，所以拓扑 A 的预设带这一级。另加一条：ifext.chip 是 frontend 时不加——那时芯片的接收链就是共享前端自己的链，60 GHz 的接收面已经是它的梯子，再串一级等于同一个前端算两遍；理想行（Mmw60Config.ideal()）走的就是这一支，改之前这一支在 60 GHz 前端下读 −39.4 dB 对 K = 1 链的 −43.0 dB，被铁律 2 的测试抓到。）"
+
+  assumed.ifext_chip_oversampling:
+    value: 4
+    unit: x bandwidth
+    source: assumed
+    cite: "本库；wifitrx 自己的波形默认 4 倍过采样，DPD 的 ACLR 观测要 fs ≥ 3 × BW"
+    note: "拓扑 A 里芯片的 DAC / ADC 采样率。拓扑 B 用 2 倍（fs_eff 已是数 GS/s）。"
+
+  assumed.ifext_dpd_max_iterations:
+    value: 2
+    unit: iterations
+    source: assumed
+    cite: "本库；wifitrx cal/dpd_cal.py::calibrate_dpd 的默认 n_iter = 2"
+    note: "60 GHz 观测回环上重训 DPD 时交给 wifitrx 的 DPD 步试的轮数。wifitrx 0.7.39 起该步自己在观测通路上读“不加预失真”和每一轮、写入最好的；本库再把它留下的放回同一输出功率，和芯片上原有的预失真器比，留好的。轮数越多在软压缩 PA 靠近饱和时越差：回退 8 dB 处观测读数 不加 / 第 1 / 2 / 3 轮是 −18.4 / −20.6 / −14.1 / +1.4 dB（示例 06 §3 用上限 3 展示）。"
+
+  assumed.mlo_sub7:
+    value: {carrier_hz: 5.5e+9, snr_db: 20.0}
+    unit: sub-7 GHz link
+    source: assumed
+    cite: "本库；MLO 的 sub-7 链路取 5 GHz 段一个信道，SNR 20 dB"
+    note: "拓扑 A 的 CFO 接法（铁律 3）：sub-7 链路用 L-STF + L-LTF 估出自己的 CFO，乘 f_c / f_sub7（= 11.0）预补偿 60 GHz 链路，残差 = sub-7 估计误差 × 频率比。前提是每台设备的 sub-7 LO、芯片 IF LO 与 60 GHz 固定 LO 同源一颗晶振（assumed.mlo_common_reference）。"
+
+  assumed.mlo_common_reference:
+    value: true
+    unit: bool
+    source: assumed
+    cite: "本库；多链路设备各射频共用一颗参考晶振是常规做法"
+    note: "不成立时（60 GHz 级自带晶振）sub-7 的估计与 60 GHz 的 CFO 无关，MLO 预补偿失效，2.42 MHz 落在芯片 L-STF 的 ±625 kHz 之外。"
+
+  # ------------------------------------------------------------ C1 / C2：接收机改进
+  assumed.cpe_window_symbols:
+    value: 17
+    unit: OFDM symbols
+    source: assumed
+    cite: "本库；接收机算法选择"
+    note: "跨符号导频 CPE 的 MMSE 合并窗口（rx/tracking.py）。Liu K = 8 MCS0 flat 上 5 / 9 / 17 / 33 的 PER 1e-2 点在 2.5–2.9 dB 之间（逐符号 4.5 dB），对窗口不敏感：合并权重 g 由导频残差自己量，窗口只定平滑估计的噪声。少于 3 个符号的包退回逐符号。示例 00 的灵敏度行给 5 与 33。"
+
+  assumed.ce_smooth_max_tones:
+    value: 9
+    unit: tones
+    source: assumed
+    cite: "本库；wifitrx DEFAULT_CE_SMOOTH_TONES = 9"
+    note: "信道估计平滑跨度自动选的上限（rx/tracking.py::auto_smooth_span）；平坦信道上音数多时取到上限（996 音 100 % 的包），56 音上受估计自身散布限制只有约 2/3 的包取到（ROADMAP C6）；选择性信道上按估计自己的音间自相关取 1–3。"
+
+  # ------------------------------------------------------------ 里程碑 3：802.11ay 两种波形（单信道、EVM 口径；数字学经 spec_sources#29）
+  assumed.ay_chain_rate:
+    value: {ofdm_oversampling: 2, sc_samples_per_chip: 3}
+    unit: samples per OFDM sample / per SC chip
+    source: assumed
+    cite: "本库；mmw60.ay.edmg.chain_rate"
+    note: "两种 ay 波形跑在同一条链、同一个采样率上：OFDM 2.64 GS/s × 2 = SC 1.76 Gchip/s × 3 = 5.28 GS/s（edmg.ofdm_params、edmg.sc_params），前端是同一个实例（铁律 2）。链的滤波器按 2.16 GHz 信道间隔建（ieee80211ay.channel_centres_ghz 的间隔），TX / RX 低通角 1.40 / 1.21 GHz，在 OFDM 占用带宽（±0.91 GHz）与 SC 成形后的带宽（滚降 0.25 时 ±1.10 GHz）之外；两者的线性失真都由训练场估计、频域均衡吃掉。"
+
+  assumed.ay_sc_pulse:
+    value: {shape: root-raised-cosine, rolloff: 0.25, span_symbols: 16}
+    unit: "-, -, chips"
+    source: assumed
+    cite: "本库；mmw60.ay.papr.rrc_taps"
+    note: "单载波的成形脉冲。标准只给频谱模板，不给滤波器（模板没有进 spec_sources，没有对模板核对）。滚降决定 SC 的峰均比：合成数字学上 16-QAM 在 0.25 时比 OFDM 低约 2.9 dB（cairn/ay.md §3）。示例 15 给 0.15 / 0.35 的灵敏度行。接收端是同一个脉冲的匹配滤波。"
+
+  assumed.ay_preamble:
+    value: {stf_length: 128, stf_repeats: 16, golay_delays: "2^(K-1), ..., 2, 1", golay_weights: "+1", cef: "SC: Golay pair of the block length, each behind a cyclic prefix of the GI", sc_guard: "Golay of the GI length", ofdm: "the standard's EDMG-STF and EDMG-CEF (edmg.ofdm_stf_ncb1, edmg.ofdm_cef_ncb1); the legacy part of the PPDU is not sent and the CFO is estimated on the EDMG-STF", ofdm_before: "ay.ofdm_training golay_pair: the SC fields at 2.64 GHz"}
+    unit: "chips, repeats, -, -, -, -, -, -"
+    source: assumed
+    cite: "本库；mmw60.ay.golay、mmw60.ay.training、mmw60.sim.ay_link"
+    note: "ay 两种波形的训练场里仍是本库自己取的部分。**SC**：一段 128 点 Golay 序列重复 16 次估 CFO（以一个序列长为滞后，范围 ±fs/256，1.76 GHz 上 ±6.875 MHz）；一对与块同长的 Golay 互补序列各带一段 GI 长的循环前缀估信道（两者的谱之和处处相等）；保护间隔是 GI 长的 Golay 序列。Golay 用拼接式构造（延迟 2^(K−1) … 1、权全 +1），不是 dmg.golay_sequences 的 Ga / Gb，CEF 也不是 dmg.cef_golay_layout 的 Gu512 / Gv512 拼法（spec_sources#48 起两者都有原文）：同长、同为全带、同能量，换了只换序列，不动估计的噪声；SC 的数这一轮要求逐位不变，没有换，DMG 的 STF 组成公开材料里也没有。**OFDM（2026-11-18 改写，spec_sources#48）**：训练场不再是假设——EDMG-STF（edmg.ofdm_stf_ncb1：88 个音、周期 128 点、30 个周期、不带 GI）与 EDMG-CEF（edmg.ofdm_cef_ncb1：352 个音上同一条单位模序列发 2 个符号、第 2 个取负，各带长 GI 192 点），数据的信道在 EDMG-CEF 上估（#48 对照标准确认：EDMG OFDM 包如此，1.76 GHz 的 L-CEF 只管两个头，所以这里建的不是 DMG 的混合速率前导；它的重采样滤波器 dmg.ofdm_preamble_hfilt 留作对照，没有用）。OFDM 这边还剩两条假设：包的 legacy 部分（L-STF、L-CEF、L-Header、EDMG-Header-A，1.76 GHz）不发；CFO 在 EDMG-STF 上估（周期同为 128 点，范围仍是 ±10.3 MHz），真机在 L-STF 上估。ay.ofdm_training: golay_pair 是 2026-11-18 之前 OFDM 的训练场（SC 那一套搬到 2.64 GHz 上发，31 % 的能量落在不用的音上），留作改前对照行（tools/diag_ay_ofdm_receiver.py、tests/test_ay_link.py 的 break-check）。"
+
+  assumed.ay_evm_payload:
+    value: {units: 64, dcm: "DCM BPSK as QPSK points per tone, DCM QPSK as 16-QAM points per tone", pilots: "P16 of stream 1 on every symbol", coding: none}
+    unit: "SC blocks or OFDM symbols, -, -, -"
+    source: assumed
+    cite: "本库；mmw60.sim.ay_link（第一轮只做 EVM 口径，用户 2026-11-16 定）"
+    note: "EVM 口径的载荷：随机星座点，不编码、不扰码。每包 64 个 SC 块（28672 个数据符号，普通 GI）或 64 个 OFDM 符号（21504 个数据音）。DCM 两档按每个音实际承载的点数取星座（DCM BPSK 每音是 QPSK 点，DCM QPSK 是 16-QAM 点），OFDM 的 EVM 对星座几乎不敏感（包络是高斯的）。导频每个符号都是第 1 流的 P16，不乘逐符号的伪随机序列。"
+
+  assumed.ay_receiver:
+    value: {cfo: "STF lag-L autocorrelation, then pilots (OFDM) / the guards (SC)", ce_window_to_gi: true, ofdm_ce_rcond: 1.0e-3, ofdm_llr_weights: estimate, sc_phase: interp, equaliser: "MMSE with the known noise variance on the channel estimate's scale (ZF with no noise; ay.sc_equalizer zf the sensitivity row) for SC; ZF per tone for OFDM", timing: "the chain's group delay from the envelopes (sim/link.envelope_lag)"}
+    unit: rule
+    source: assumed
+    cite: "本库；mmw60.sim.ay_link"
+    note: "ay 接收机的选择。信道估计只用一对 Golay 序列，不平滑时它自己的噪声在 in-band SNR 20 dB 上把 EVM 拉到 SC −18.4 / OFDM −17.4 dB；把估计的冲激响应截在 GI 以内（再留 GI/8 的前驱），噪声降 512 / 72 ≈ 8.5 dB，信道短于 GI 时什么也不丢——DMG 接收机的通常做法，标准不规定。SC 的相位跟踪在每块前后两段已知 GI 之间线性插值（sc_phase: interp）：每块只取尾部 GI 一个相位时，60 GHz 的相噪在 291 ns 的块里漂，预设回退上单开相噪，SC 64-QAM 每块一个相位读 −25.1 dB、插值读 −27.5 dB，OFDM（每个符号 16 个导频）−27.7 dB；插值是 OFDM 逐符号导频的对应做法。示例 15 给 block 的灵敏度行。2026-11-16 更正：SC 的 MMSE 噪声方差原按单位标度给（1/SNR），而信道估计带着链的增益（mean|h|² ≈ 0.064），正则化大了约 16 倍；flat 信道上只是整体缩放、被去偏抵消，多径下白丢约 1.4 dB（in-band SNR 12 dB、CR 信道）。现在按估计自己的标度给（mean|h|²/SNR）。2026-11-18（OFDM 接收机，spec_sources#48）：OFDM 的信道在 EDMG-CEF 的两个符号上逐音最小二乘，再把冲激响应限制在同一个窗（GI 96 点加 GI/8 = 108 个抽头）。响应只在 512 个 bin 里的 352 个上看得到：108 个抽头透过 69 % 的带宽只张成约 108 × 352 / 512 = 74 个方向（奇异值从第 75 个的 0.65 掉到第 85 个的 7e-5），精确的最小二乘把 108 / 352 的噪声全留下，(108 / 352) / 2 = 0.153，与原先 2.64 GHz 上的 Golay 对一样——换训练场本身不省噪声。拟合只留奇异值在最大值 ofdm_ce_rcond = 1e-3 以上的 82 个方向，估计噪声 (82 / 352) / 2 = 0.1165（0.48 dB，原 0.62 dB）；窗内信道的截断偏差在 −60 dB 以下。逐音不均匀：带中约 0.94 倍均值，带边各 8 个音 1.85 倍，最外一个音 4.0 倍，DC 空隙两侧的 k = ±2 各 1.65 倍（实测 0.92 / 1.86 / 4.4）。灵敏度（理想链、16-QAM 3/4、13 dB、跨符号平滑开）：1e-1 留 78 个方向丢 0.52 dB、1e-3 留 82 个丢 0.54 dB、1e-6 留 88 个丢 0.58 dB。公共相位跨 17 个符号合并（assumed.cpe_window_symbols，be 行 C1 的 rx.tracking.smoothed_cpe 原样用），逐符号 16 个导频的相位噪声 0.12 dB 降到 0.01 dB。OFDM 解映射的 LLR 按信道估计的 |H|² 逐音加权（ofdm_llr_weights: estimate）：迫零后第 k 个音的噪声是 σ²/|H_k|²，权就该是 |H_k|²；估计准、信道 flat 时各音的权相同，什么也不改。之前各音同权（uniform），估计带噪时带边上估计偏小的音会把又大又错的 LLR 交给解码器，而且整包每个符号、每个码字都错在同一处——DCM BPSK 1/2（门限约 1 dB，估计的相对误差平均 9 %、最外一个音 4.4 倍）因此丢 0.9 dB、PER 曲线拖一条尾巴（tools/diag_ay_ofdm_low_snr.py：换成无噪声的估计后 OFDM 比 SC 好 0.25 dB，CFO 估计与相位跟踪不花代价）。"
+
+  assumed.ay_ofdm_multipath_margin_db:
+    value: 0.85
+    unit: dB
+    source: assumed
+    cite: "本库；示例 15 §10（examples/expected/15_ay_on_the_shared_front_end.txt）"
+    note: "距离表“多径”一列里 OFDM 各档门限比 flat 多要的 SNR。不是量出来的门限：EDMG OFDM 的 16 / 64-QAM 要先在一个 OFDM 符号内做块交织，置换没有公开（17/1170r2 写 TBD，assumed.ay_ofdm_tone_order），本库按顺序放比特，多径下量出来的 OFDM 门限不是规范的码字排法给的数，所以不量。取的是示例 15 §10 在校准链、预设回退、16-QAM 载荷上读到的 EVM 口径的差：CR 替身（rms 7 ns，K 10 dB）下带内 SNR 12 dB 时 OFDM 的 EVM 比 flat 差 0.85 dB（2026-11-18 OFDM 接收机改动之前 0.86）。这是每包平均 EVM 的差，不是 PER 1e-2 的门限差：没有交织时深衰落的音连着落在同一个码字里，真实的门限差只会更大；有规范的交织时会小一些。对各档取同一个数。SC 不用它：SC 的多径门限是量的（data/spec/ay_per_thresholds.yaml 的 multipath 一节）。"
+
+  assumed.ay_sensitivity:
+    value: {sensitivity: dmg.rx_sensitivity_dbm, reference_receiver: dmg.sensitivity_assumptions, sc_twin_by: [modulation order, code rate, repetition], sc_tables: [dmg.sc_mcs, dmg.sc_mcs_extended], ofdm_twin_by: [n_bpsc, code rate], implementation_loss: taken out, bandwidth: occupied}
+    unit: "-"
+    source: assumed
+    cite: "本库；mmw60.ay.edmg.dmg_twin / ideal_threshold_db，mmw60.arraylink.ay_mcs_ranges"
+    note: "按功率换距离要每个 EDMG MCS 的解码门限，spec_sources#29 没有 EDMG 灵敏度。本库的取法：EDMG MCS 若在 DMG 表里有同样每符号比特数、码率与重复的一档（SC 对 dmg.sc_mcs，按调制阶数、码率、重复；OFDM 对 dmg.ofdm_mcs，按每子载波编码比特数与码率——EDMG 的 DCM BPSK / DCM QPSK 每子载波 1 / 2 比特，与 11ad 的 SQPSK / QPSK 相同，edmg.ofdm_mcs 的注释说它们在 18/1152r0 之前就叫这两个名字），就用那一档的最低灵敏度，减去 kT·B（B 取该波形的占用带宽：SC 1.76 GHz、OFDM 352 个音 × 5.15625 MHz，与 ay 链路的带内 SNR 同一口径）和参考接收机的 10 dB NF、5 dB 实现损耗，得理想解码器的带内 SNR 门限。实现损耗拿掉，是因为本库把发射与接收两侧的损伤读成 EVM 底板、按噪声项加回去（与 be 行用本库实测门限的做法一致）；留着它就重复计了，示例 15 §9 有留着它的灵敏度行。SC 先对 dmg.sc_mcs，再对 802.11-2016 的扩展档 dmg.sc_mcs_extended（9.1、12.1–12.6，spec_sources#33 起有原文，2026-11-16 接上）：EDMG SC 的 QPSK 7/8、16-QAM 13/16 与 7/8、64-QAM 5/8 起各档由此有了门限。码率 7/8 的孪生档不是同一个码：DMG 的是 13/16 码打掉 48 个校验位（624 位，dmg.ldpc_r7_8_punctured），EDMG 的是自己的 672 位码（edmg.ldpc_672_r7_8）。仍没有对应档的（SC 的 BPSK 7/8 与 64-QAM 1/2，OFDM 的各 7/8、DCM BPSK 3/4 起、DCM QPSK 13/16 起、64-QAM 1/2）没有门限，不进距离表。2026-11-16 起 SC 的预设改用本库实测的门限（data/spec/ay_per_thresholds.yaml，spec_sources#33 的码，ay.edmg.threshold_db 的 rule=measured），这条规则只管 OFDM 与 SC MCS 1（重复 2 的编码没建），并作为 rule=twin 的灵敏度读法留着（两种波形同口径）。2026-11-17 起 OFDM 的 16-QAM / 64-QAM（MCS 11–20）也用实测门限（编码 OFDM 载荷，assumed.ay_ofdm_tone_order），这条规则只剩 OFDM 的 DCM 档（MCS 1–10，配对不在 spec_sources）与 SC MCS 1。2026-11-17 spec_sources#43 给了 DCM 的配对，OFDM 的 DCM 档也改用实测，这条规则只剩 SC MCS 1（重复 2 的编码步骤待 #43 核对原文）；实测对它：DCM 档上它乐观 0–1.44 dB（MCS 1 +1.26、MCS 6 +1.33、MCS 7 +1.44，MCS 2 恰好相等）。2026-11-17 spec_sources#43 贴了 rho = 2 的原句（PR #46，25b2c5e：换的是补的 168 个零，不是一半校验），SC MCS 1 的编码载荷建好、门限实测 −1.23 dB；两种波形每档都用实测门限，这条规则只作为 rule=twin 的灵敏度读法留着。实测对它：SC MCS 1 上它乐观 0.25 dB（孪生 −1.48）。实测对它：BPSK / QPSK 在 DMG 原有档上 ±0.5 dB 以内；16-QAM、64-QAM 与扩展档的 7/8 上它悲观 1.4–4.3 dB（cairn/ay.md §9d），OFDM 的高阶档很可能也一样悲观（2026-11-17 更正：实测推翻了这句，OFDM 上它乐观 0.44–1.10 dB，因为本库的 OFDM 接收机比 SC 差 0.6–1.0 dB，cairn/ay.md §9d；所以 DCM 档借来的门限偏乐观的可能大）。交叉核对：同调制同码率时比本库实测的 11be LDPC 门限高约 1–2 dB（示例 15 §9）：DMG 的码长 672、参考接收机都偏保守。"
+
+  assumed.ay_operating_point:
+    value: {rule: assumed.pa60_operating_rule, payload: "the waveform's fastest 16-QAM MCS", measured_on: "the ideal chain with only the PA on, flat, no noise (arraylink.ay_pa_alone_evm_db)"}
+    unit: "-"
+    source: assumed
+    cite: "本库；mmw60.arraylink.ay_operating_obo_db，示例 10 §3d"
+    note: "阵列一节里 ay 两种波形“各自的工作点”：把预设的规则（PA 单独时 EVM 刚好到 802.11ad 16-QAM 3/4 的发射限值 −21 dB，assumed.pa60_operating_rule）用在该波形自己的 16-QAM 载荷包络上，而不是 OFDM 型的高斯包络。共享实例的预设回退（7.5 dB）不动：示例 10 §3d 两种读法并列，预设回退一行就是所有行同一个工作点的读法。SC 的包络峰均比低，同一条规则给出的回退小得多（约 4 dB）；OFDM 的与预设相近（约 7.1 dB）。规则只看 PA，不看校准残差与相噪；那些在每个单元回退上的校准链底板里。"
+
+  assumed.ay_ofdm_tone_order:
+    value: {order: "the data tones of every OFDM symbol in ascending order, symbol after symbol", dcm: "ay.dcm, the static pairing of edmg.ofdm_modulation_mapping"}
+    unit: "-"
+    source: assumed
+    cite: "本库；ay.coding.coded_packet 的 OFDM 载荷，tools/measure_ay_thresholds.py"
+    note: "EDMG OFDM 的 LDPC tone mapping（码字比特到数据子载波的排法）与 DCM 的配对不在 spec_sources 里（已请求）。本库的编码 OFDM 载荷把码字比特按顺序放到每个 OFDM 符号的数据子载波上（升序，一个符号接一个符号）。flat 信道上逐音迫零后各子载波 SNR 相同，比特怎么排不改 PER，所以 16-QAM、64-QAM 各档的 flat 门限不受这条影响；多径下要规范的 tone mapping 才对。DCM 档（MCS 1–10）的两个子载波怎么配对决定分集增益，没有规范的配对就不建，它们的门限仍按 assumed.ay_sensitivity 借 DMG 孪生档。2026-11-17 spec_sources#43 回了：16-QAM / 64-QAM 每点独立映射，第 k 个数据符号按顺序放到数据子载波 M_d(k) 上（edmg.ofdm_modulation_mapping 的 tone_placement，17/0870r3），与本库的顺序一致；但 17/1568r0 说 16 / 64-QAM 要先在一个 OFDM 符号内做块交织，交织的置换公开文件里没有（17/1170r2 写 TBD）。所以本条 assumed 的实质变成“不做符号内交织”：flat 上不改 PER，多径下要等置换。DCM 的配对（静态配对 P(k) = k + N_SD/2）已在 edmg.ofdm_modulation_mapping 里，编码载荷另做。（2026-11-17 已做：DCM 档的编码载荷用静态配对，门限实测，mmw60.ay.dcm。）"
+
+  assumed.ay_sector_sweep:
+    value: {frame: "DMG control PHY (MCS 0) per sector", threshold: "dmg.rx_sensitivity_dbm at MCS 0, the reference receiver taken out as in assumed.ay_sensitivity", transmit_sweep: "the far end on one element", receive_sweep: "behind the chosen transmit beam", bandwidth: "the SC chip rate (the control PHY is single carrier)", timing: "every sector one SSW frame: a DMG control PHY PPDU of dmg.ssw_frame octets (dmg.control_phy preamble, codewords by dmg.control_phy_encoding), SBIFS apart"}
+    unit: "-"
+    source: assumed
+    cite: "本库；mmw60.ay.edmg.control_threshold_db，示例 10 §4d"
+    note: "ay 自己的扇区扫描：每个扇区发一个 SSW 帧，用 DMG 控制 PHY（MCS 0，SC 加 Golay 扩频）发，远端要把最好那个扇区的帧解出来。门限按 assumed.ay_sensitivity 同一条规则从 MCS 0 的最低灵敏度反推（拿掉参考接收机的 NF 与实现损耗），带宽取 SC 的码片速率；注意灵敏度表对 MCS 0 的判据是 256 octets 上 PER 5 %，其他档是 4096 octets 上 1 %。发端扫描时远端只用一个单元（与 be 行靠 MLO 触发的训练同样的设定，assumed.array_training），收端扫描在选好的发端波束后面。扫一轮的时长：每个扇区一个 SSW 帧，帧间隔 SBIFS 1 µs。帧是一个 DMG 控制 PHY PPDU（2026-11-17 起，spec_sources#43）：前导 6400 + 1152 码片（dmg.control_phy），头部 5 字节与帧的 26 字节按 dmg.control_phy_encoding 切成 2 个 LDPC 码字（88 + 160 数据位，各加 168 校验位），每位 32 码片，共 14.909 µs，是精确值。（2026-11-16 至 11-17 的读法：前导 3.564 µs + 248 位按 27.5 Mb/s，12.58 µs，当作下限；#43 更正了前导（STF 5120 → 6400 码片，取自较早的 0433r2），又给了切分规则，两处一起改。）EDMG 的 short SSW（edmg.short_ssw，48 位）放在 EDMG PPDU 的数据域里：单流 SC PPDU 的前导与头有了（edmg.sc_siso_preamble，5376 码片），但用哪种 PPDU、哪个 MCS 公开文件没有，没算；TRN 字段也没有建。"
+
+  assumed.ay_cal_probe:
+    value: {standard: 11be, base_bandwidth_hz: 80.0e+6, k: 22, oversampling: 3}
+    unit: "-, Hz, -, samples per probe sample"
+    source: assumed
+    cite: "本库；mmw60.calcheck.run_cal_ay"
+    note: "在 ay 的链（2.16 GHz、5.28 GS/s）上跑 wifitrx 校准序列用的评分波形：wifitrx 的序列要一个带标准导频的 OFDM 波形，且采样率 = 带宽 × 整数过采样。2.16 GHz 配 5.28 GS/s 是 2.44 倍，不是整数；5.28 GS/s 的整数分之一里，1.76 GHz（× 3）既落在链的通带里，又能写成标准波形升频：11be 80 MHz × 22，996 个音、音距 1.71875 MHz，占 1.71 GHz。链自己的步骤（LPF 角频、IQ 的 FIR、DC、LO 泄漏）按链的参数走（tx.params.bandwidth_hz、lpf.fc_nominal_hz），探针只用于快照、终检和 DPD 训练。探针比 ay 波形窄：OFDM 占 ±0.92 GHz、SC 成形后 ±1.10 GHz，探针只到 ±0.86 GHz，带边的 IQ 校正是外推出来的，所以校准后的链要用 ay 波形自己再读（示例 15 §7–§8）。"

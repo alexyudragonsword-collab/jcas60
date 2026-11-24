@@ -1,0 +1,155 @@
+# jcas60 自己的取舍（铁律 1）。关于外部世界的数不在这里：它们在 vendored 的 spec_sources
+# （src/jcas60/vendor/spec_sources/data/*.yaml），mmw60_trx 的预设取舍在它自己的表里
+# （src/jcas60/vendor/mmw60/data/spec/survey.yaml），jcas60.sources 把三张表合起来按键读，
+# 同一个键出现两次直接报错。
+#
+# 这张表只有一种标签：本库自己定的数。每条的 note 写两件事——为什么这样取、换了会动什么。
+# 示例 00 的末尾把这张表整份打印出来；tests/test_sources.py 按 grep 计数核对标签，
+# 所以文件头与各字段的文字里不写“标签词 + 冒号”的字串。
+
+entries:
+
+  # ------------------------------------------------------------ 前端：三行共用的数里本库定的两个
+  jcas60.antenna_gain_dbi:
+    value: {tx: 10.0, rx: 10.0}
+    unit: "dBi, dBi"
+    source: assumed
+    cite: "本库；等于 fmcw_radar 默认配置的占位值（它的报告 inputs.tx_gain_dbi / rx_gain_dbi）"
+    note: "收、发天线增益。A 行的数直接取 fmcw_radar 的报告，它用的是 10 dBi（它自己的占位），三行共用一套前端数字（铁律 2），所以 B、C 也取 10 dBi，测试核对与报告的输入相等。换了会动什么：每 1 dB 发射增益动三行的 EIRP 1 dB（已顶到法规上限的行不动 EIRP，改动回退），每 1 dB 接收增益动三行的 SNR 1 dB；A 行不再等于 fmcw_radar 的现成报告，得用它的工具带覆盖值重出一份。mmw60_trx 的通信前端预设是 2 dBi（封装内天线），示例 00 §8 有这一档的灵敏度行。"
+
+  jcas60.rx_gain_db:
+    value: 40.0
+    unit: dB
+    source: assumed
+    cite: "本库；等于 fmcw_radar 默认配置的接收增益档（它的报告 inputs.rx_gain_db）"
+    note: "接收机增益档。它决定带内 P1dB 取雷达芯片手册 Figure 7-2 的哪一点（40 dB 档 −34 dBm）。换了会动什么：单站感知的压缩判据——每降 1 dB 增益，带内 P1dB 高 1 dB，需要的隔离度少 1 dB；图上最低的 30 dB 档 NF 从 11.0 升到 15.6 dB（示例 00 §5 给每一档）。SNR 不随它动：三行的 NF 都取手册表里的典型值。"
+
+  # ------------------------------------------------------------ ay 感知波形
+  jcas60.channel:
+    value: {number: 2, width_hz: 2.16e+9}
+    unit: "-, Hz"
+    source: assumed
+    cite: "本库；信道 2 是 mmw60_trx 的 ay 预设所在的信道，宽度是 ieee80211ay.channel_centres_ghz 相邻两项之差"
+    note: "B、C 两行用的 EDMG 信道，以及法规检查里占用频带的算法：按整个 2.16 GHz 信道算（59.40–61.56 GHz），不按 1.76 GHz 的码片率算。换了会动什么：按雷达限值读时落在哪一档——信道 2 的上沿正好是 57–61.56 GHz 档的上沿，带关断时间可到 20 dBm；信道 1（57.24–59.40 GHz）还落进 57–59.4 GHz 档（室内 20 dBm，无关断要求）；信道 3（61.56–63.72 GHz）是 57–64 GHz 档的 14 dBm，信道 4 及以上跨出 64 GHz，只剩默认的 10 dBm。按通信限值读时不动。波长随信道变，SNR 动不到 0.1 dB。"
+
+  jcas60.sensing_field:
+    value: "L-CEF：Gu512 与 Gv512 各做一次循环相关再相加；L-STF 不参与相关"
+    unit: text
+    source: assumed
+    cite: "本库；序列与拼法是 dmg.golay_sequences、dmg.cef_golay_layout"
+    note: "拿包里的哪一段做感知。取 L-CEF 是因为每个单载波包都有它，拼法有公开出处，且 Gu512、Gv512 各自前面的 128 码片正好是循环前缀，128 码片以内的时延上互补旁瓣严格为零。L-STF 不用：它的组成公开材料里没有（spec_sources 的 ROADMAP），只知道末段是 −Ga128。802.11bf 实际用哪一段还没有条目（spec_sources#54）。换了会动什么：处理增益——把 L-STF 的 2176 码片也用上是 10·log10((2176 + 1024) / 1024) = +4.95 dB；改用 TRN 字段则由 TRN 的个数定。"
+
+  jcas60.sensing_packet:
+    value: {fields: [l_stf_chips, l_cef_chips, l_header_chips, edmg_header_a_chips], data_blocks: 0, trn_units: 0}
+    unit: "edmg.sc_siso_preamble 的字段名, 块, 单元"
+    source: assumed
+    cite: "本库；各段长度是 edmg.sc_siso_preamble"
+    note: "一个专门的感知包由哪些段组成：单信道、单流 EDMG SC 包的前导与两个头，不带数据、不带 TRN，是能发出来的最短的包。换了会动什么：只动占用的空口时间（每个包 5376 码片 = 3.05 µs），不动 SNR（只有 L-CEF 参与相关）。感知若搭在本来就要发的数据包上，额外的空口时间是零，但包的间隔就由业务定，不再均匀。"
+
+  jcas60.sensing_burst:
+    value: {n_packets: 64, interval_s: 1.0e-4, frames_per_s: 30.0}
+    unit: "包, s, 帧/s"
+    source: assumed
+    cite: "本库；等于 fmcw_radar 默认配置的慢时间（64 个 chirp、周期 100 µs、每秒 30 帧）"
+    note: "一次感知（一帧）发多少个感知包、间隔多少、每秒几帧。取成与 A 行相同，速度分辨率与不模糊速度因此只差波长（60.48 对 60 GHz）。换了会动什么：包数 ×2 则处理增益 +3 dB、速度分辨率细一倍、空口时间 ×2；间隔 ×2 则不模糊速度减半、速度分辨率细一倍；帧率只动空口时间与雷达读法下的关断余量。"
+
+  jcas60.packet_overhead:
+    value: {sifs_per_packet: 1}
+    unit: "个 SIFS"
+    source: assumed
+    cite: "本库；SIFS 是 dmg.phy_timing#sifs_s"
+    note: "每个感知包除了自己的时长，再算一个 SIFS 的空口时间（包前后通信不能紧贴着发）。换了会动什么：按通信限值读时的空口占比——不算间隔是 0.59 %，算一个 SIFS 是 1.16 %。"
+
+  jcas60.doppler_window:
+    value: hann
+    unit: text
+    source: assumed
+    cite: "本库；等于 fmcw_radar 默认配置的多普勒窗"
+    note: "慢时间（包与包之间）FFT 的窗，取成与 A 行相同。换了会动什么：矩形窗 SNR 高 1.76 dB、速度分辨率细到 0.89 / 1.44 倍，多普勒旁瓣从 −31.5 dB 升到 −13.3 dB（静止的泄漏会从零多普勒漏进目标所在的行）。快时间不加窗：相关接收的距离响应就是成形脉冲的自相关。"
+
+  jcas60.adc:
+    value: {samples_per_chip: 2, desense_allowed_db: 1.0}
+    unit: "样点/码片, dB"
+    source: assumed
+    cite: "本库；ENOB 随采样率的模型与满量程余量取 mmw60_trx 的 assumed.converter_*"
+    note: "相关接收机的 ADC 每个码片采两点（3.52 GS/s，I、Q 各一路），波形级仿真也跑在这个速率上；量化噪声、泄漏的相噪残余各自最多把热噪声底抬高 1 dB，才算“不压低灵敏度”。换了会动什么：每码片 3 点则带内量化噪声再低 1.76 dB、但 ENOB 模型少 0.29 bit（合计几乎不动）；允许抬高 3 dB 则两项判据各松 5.9 dB。"
+
+  jcas60.compression_margin_db:
+    value: 10.0
+    unit: dB
+    source: assumed
+    cite: "本库"
+    note: "单站时泄漏要比接收机带内 P1dB 低多少才算线性。压缩是闭式判据，波形级仿真里没有非线性（ROADMAP）。换了会动什么：需要的隔离度逐 dB 跟着动；取 0 dB（泄漏正好在 P1dB 上）是下限，示例 00 §5 两个数都给。"
+
+  jcas60.leakage_delay_s:
+    value: 1.0e-10
+    unit: s
+    source: assumed
+    cite: "本库"
+    note: "单站时发射泄漏到接收的路径时延：0.1 ns（约 3 cm 的片上 / 板上耦合路径）。换了会动什么：泄漏的本振相噪残余按时延的平方涨（共用本振时相噪相关抵消，残余 ∝ sin²(πfτ)）——0.2 ns 时需要的隔离度多 5.5 dB、0.05 ns 时少 5.9 dB（低频偏按时延平方走，远频偏处 sin² 已经饱和）；泄漏落在哪个时延格上也跟着动（0.1 ns 是 0.18 码片）。天线反射或罩子反射的路径更长，不在这一条里。"
+
+  jcas60.lo_phase_noise:
+    value: "tgad_em.pn_params 的单极点单零点模型，每台设备一个本振"
+    unit: text
+    source: assumed
+    cite: "本库；模型是 tgad_em.pn_model_shape / tgad_em.pn_params"
+    note: "B、C 两行的本振相噪取 TGad 评估方法学的模型（PSD0 −90 dBc/Hz，1 MHz 处 −93 dBc/Hz，与雷达芯片手册 1 MHz 处的数同量级）。单站收发共用一个本振，双站两台各一个、互不相关。A 行的本振是 fmcw_radar 自己的 ADPLL（要出 chirp，换不成固定本振）：这是三行里唯一不是同一个数的前端量，对照表里标明。换了会动什么：单站泄漏的相噪残余与双站直达径的相噪逐 dB 跟着 PSD 动；热噪声限的 SNR 不动。"
+
+  jcas60.oxygen_frequency_ghz:
+    value: 60.0
+    unit: GHz
+    source: assumed
+    cite: "本库；衰减是 itu_p676.gamma_o_dry_sea_level 在这个频点的值"
+    note: "氧气衰减取表里 60 GHz 的点（14.651 dB/km），用在 60.48 GHz 上，因为表里没有 60.48 GHz（spec_sources#54 顺带请它补）。换了会动什么：5 m 处往返 10 m，表里 60–60.81 GHz 之间最多差 0.41 dB/km，即 0.004 dB；Pd 0.9 的最远距离上（十几米）不到 0.02 dB。"
+
+  # ------------------------------------------------------------ 目标与检测
+  jcas60.target:
+    value: {range_m: 5.0, velocity_mps: 2.0}
+    unit: "m, m/s"
+    source: assumed
+    cite: "本库；等于 fmcw_radar 默认配置的目标（它的报告 target.range_m / velocity_mps）；RCS 是 target_rcs.deep2019_pedestrian_77g#co_pol_min_dbsm"
+    note: "对照表的目标：5 m 处远离的人体，径向速度 2 m/s。RCS 取行人仿真范围的下端 −10 dBsm（77 GHz 的射线追踪，不是 60 GHz 实测）。换了会动什么：距离进 R⁴，每 ×2 是 −12 dB；速度只动目标落在哪个多普勒格与 Golay 旁瓣（示例 00 §7）。"
+
+  jcas60.detection:
+    value: {pd: 0.9}
+    unit: "-"
+    source: assumed
+    cite: "本库；虚警概率取 fmcw_radar 报告的 detection.pfa，判据是它的 processing/detection.py（Swerling 0、噪声电平已知）"
+    note: "“能探测到的最远距离”按检测概率 0.9 算，三行同一条判据。换了会动什么：0.5 时门限低 2.35 dB（9.40 对 11.75 dB），距离远 14.5 %；换成 CA-CFAR 在图上的门限（fmcw_radar 的报告给 12.24 dB，比已知噪声电平的 11.75 dB 高 0.49 dB）距离近约 3 %。"
+
+  jcas60.bistatic_geometry:
+    value: {r_tx_m: 5.0, r_rx_m: 5.0, baseline_m: 5.0}
+    unit: "m, m, m"
+    source: assumed
+    cite: "本库"
+    note: "双站（C 行）的几何：发、收两台设备与目标成等边三角形，目标离两台都是 5 m，双站角 60°；目标沿双站角平分线远离；双站 RCS 取单站的条目；直达径上两副天线按满增益算（对动态范围是最坏情况）。换了会动什么：基线越短越接近单站（距离分辨率 ∝ 1 / cos(β/2)，60° 时粗 15 %），直达径也越强（基线减半 +6 dB）；目标不在平分线上运动时多普勒再乘它与平分线夹角的余弦。"
+
+  # ------------------------------------------------------------ 空口时间的算法
+  jcas60.fmcw_airtime:
+    value: "FMCW 一帧的 chirp 串期间，这套前端不能通信"
+    unit: text
+    source: assumed
+    cite: "本库"
+    note: "A 行折算通信吞吐损失的算法：同一套前端要么出 chirp 要么发通信波形，一帧的 6.4 ms 整段算感知占用。换了会动什么：若雷达另有一套前端，占比是零，但那就不是“同一套前端”了。"
+
+  jcas60.radar_reading_airtime:
+    value: {lower: "关断时间只管感知的发射：与按通信限值读时同一个占比", upper: "关断时间管这台设备的全部发射：任意 33 ms 里至少关断规定的时长"}
+    unit: text
+    source: assumed
+    cite: "本库；关断时间的数是 fcc15255.radar_* 条目"
+    note: "按雷达限值读时感知占掉多少通信时间，原文没有说（spec_sources#54 第二组第 3 问），所以给上下两个界。换了会动什么：下界与通信读法相同（约 1 %）；上界是关断要求占窗口的比例（57–61.56 GHz 档 16.5 / 33 = 50 %）。"
+
+  jcas60.comm_limit_kind:
+    value: average
+    unit: text
+    source: assumed
+    cite: "本库；限值是 fcc15255.eirp_avg_dbm / fcc15255.eirp_peak_dbm"
+    note: "按通信限值读时用平均 EIRP 40 dBm 这一条：感知场是 π/2-BPSK，成形后峰均比不到 3 dB（mmw60_trx 示例 15 §2），平均值顶到 40 dBm 时峰值不到 43 dBm。换了会动什么：单天线时都不起作用——这套前端满功率只有 22 dBm EIRP，离 40 dBm 还差 18 dB。"
+
+  # ------------------------------------------------------------ 波形级仿真的做法
+  jcas60.sim:
+    value: {seed: 1, frames_averaged: 8, buffer_chips: 2048, exclude_doppler_bins: 4, exclude_range_lags: 8, cfar_guard: 2, cfar_train: 8}
+    unit: "-, 帧, 码片, 格, 格, 格, 格"
+    source: assumed
+    cite: "本库；CFAR 的保护格与训练格等于 fmcw_radar 默认配置"
+    note: "波形级仿真的数值设置：随机种子、SNR 取几帧的平均（峰上的噪声起伏每帧约 ±0.2 dB）、每个包的缓冲长度、读噪底时绕开峰的格数。换了会动什么：只动读数的统计起伏（8 帧平均后约 ±0.1 dB），不动期望值；缓冲短于场长加最大时延时结果是错的（代码里检查）。"

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jcas60"
+version = "0.1.0"
+description = "60 GHz joint communication and sensing: sensing with the 802.11ay training field against a dedicated FMCW radar, on one set of front-end numbers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "ruff>=0.4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# the tables, the recorded upstream report and the siblings' outputs travel with the package (everything is read by key)
+jcas60 = ["data/*.yaml", "data/upstream/*.json", "vendor/spec_sources/data/*.yaml", "vendor/mmw60/data/spec/*.yaml",
+          "vendor/mmw60/examples/expected/*.txt", "vendor/fmcw_radar/examples/expected/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 180
+target-version = "py310"
+# vendored copies are checked against upstream, not re-linted here
+extend-exclude = ["src/jcas60/vendor"]
+
+[tool.ruff.lint]
+# real defects (pyflakes: undefined names, unused imports / variables) and syntax errors, like the siblings
+select = ["E9", "F"]
