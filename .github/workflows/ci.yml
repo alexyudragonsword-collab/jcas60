@@ -1,0 +1,167 @@
+name: ci
+
+# lint + tests + vendor drift against the three pinned siblings (with fmcw_radar's report regenerated from the
+# pin) + the numerical fingerprint of base against head, on every push and pull request (the siblings' workflow).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install "ruff>=0.4"
+      - run: ruff check src/ tests/ examples/ tools/
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: Tests
+        run: pytest -q
+
+  # Vendor drift: src/jcas60/vendor must still match the pinned spec_sources, mmw60_trx and fmcw_radar commits.
+  # Each sibling is checked out at exactly the pinned SHA, so --strict (stale pins fail) is satisfiable here and
+  # --fail-on-skip makes an unverified file red rather than a pass.  Row A's recorded report is regenerated from
+  # the same fmcw_radar checkout and compared.
+  vendor-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: jcas60
+      - name: Checkout spec_sources (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: alexyudragonsword-collab/spec_sources
+          ref: f9ce3f2b035d4d83269aa4a4eb33982c53838286
+          path: _siblings/spec_sources
+      - name: Checkout mmw60_trx (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: alexyudragonsword-collab/mmw60_trx
+          ref: cfb401aae3d4271f1ed1146f8c1f182065b26fe7
+          path: _siblings/mmw60_trx
+      - name: Checkout fmcw_radar (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: alexyudragonsword-collab/fmcw_radar
+          ref: fb0fc165457b4b1ba40e3e777a987f27d842b796
+          path: _siblings/fmcw_radar
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: jcas60/pyproject.toml
+      - name: Install
+        working-directory: jcas60
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: Vendor drift check
+        working-directory: jcas60
+        run: >
+          python tools/vendor_check.py --strict --fail-on-skip
+          --siblings spec_sources=${{ github.workspace }}/_siblings/spec_sources
+          mmw60_trx=${{ github.workspace }}/_siblings/mmw60_trx
+          fmcw_radar=${{ github.workspace }}/_siblings/fmcw_radar
+      - name: Row A's report is what the pinned fmcw_radar writes
+        working-directory: jcas60
+        run: python tools/upstream_report.py check --strict --sibling ${{ github.workspace }}/_siblings/fmcw_radar
+
+  # Numerical fingerprint (law 5): base and head are recorded side by side in this job, so the comparison is
+  # bit for bit whatever the runner; a change that moves a number has to say so with (numbers-move: why).
+  fingerprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: Record the head
+        run: python tools/fingerprint.py record head.json
+      - name: Pick the base
+        id: base
+        run: |
+          before="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            sha="${{ github.event.pull_request.base.sha }}"
+          elif [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
+            sha="$before"
+          else
+            git fetch --no-tags origin main >/dev/null 2>&1 || true
+            sha="$(git merge-base HEAD origin/main 2>/dev/null || true)"
+            if [ "$sha" = "$(git rev-parse HEAD)" ] || [ -z "$sha" ]; then sha="$(git rev-parse --verify -q HEAD^ || true)"; fi
+          fi
+          # a base without the tool (the repository's first commits) has nothing to compare with
+          if [ -n "$sha" ] && ! git cat-file -e "$sha:tools/fingerprint.py" 2>/dev/null; then
+            echo "::notice::the base $sha has no tools/fingerprint.py: nothing to compare the fingerprint with"; sha=""
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Record the base
+        if: steps.base.outputs.sha != ''
+        run: |
+          git worktree add ../base ${{ steps.base.outputs.sha }}
+          (cd ../base && python tools/fingerprint.py record "$GITHUB_WORKSPACE/base.json")
+      - name: Compare
+        if: steps.base.outputs.sha != ''
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          BASE: ${{ steps.base.outputs.sha }}
+        run: |
+          python tools/fingerprint.py compare base.json head.json > diff.txt || true
+          cat diff.txt
+          if grep -q "values differ" diff.txt; then
+            if echo "$PR_LABELS" | grep -q numbers-move || git log --format=%B "$BASE"..HEAD | grep -q "(numbers-move"; then
+              echo "numbers moved and the change says so"
+            else
+              echo "::error::numbers moved without a (numbers-move: why) marker"; exit 1
+            fi
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fingerprint
+          path: |
+            head.json
+            base.json
+            diff.txt
+          if-no-files-found: ignore
+          retention-days: 30
