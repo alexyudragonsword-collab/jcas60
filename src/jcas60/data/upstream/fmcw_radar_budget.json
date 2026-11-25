@@ -3,7 +3,7 @@
   "command": "python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>",
   "config": "configs/radar_60g_sensing.yaml",
   "repo": "fmcw_radar",
-  "sha": "fb0fc165457b4b1ba40e3e777a987f27d842b796"
+  "sha": "c303566180c2ef22bd2bf6ffaa1f08e59174e110"
  },
  "report": {
   "angle": {},
@@ -603,6 +603,23 @@
    "pd": 1.0,
    "pfa": 0.0001,
    "quant_share_db": 0.06790524873096615,
+   "range_at_pd": {
+    "criterion": "the SNR of one look meets what the map's CA-CFAR needs for this Pd (cfar.snr_pd90_db: its threshold's fluctuation and the target's own leak into its training cells included)",
+    "if_band_range_m": 14.9896229,
+    "limited_by": "if_band",
+    "n_looks": 1,
+    "not_included": [
+     "scalloping at a particular range",
+     "the LO's noise floor",
+     "mutual coupling",
+     "the receiver's compression by the TX leakage"
+    ],
+    "pd": 0.9,
+    "pfa": 0.0001,
+    "range_m": 14.9896229,
+    "snr_limited_range_m": 28.77591151711674,
+    "snr_required_db": 12.239994299053524
+   },
    "snr_cell_db": 43.339039461004404,
    "snr_chirp_db": 27.038152311722342
   },

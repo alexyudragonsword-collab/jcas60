@@ -1,4 +1,4 @@
-# Vendored from mmw60_trx@cfb401aae3d4271f1ed1146f8c1f182065b26fe7: src/mmw60/ay/golay.py
+# Vendored from mmw60_trx@442fabd99c16b0e6cfc4432d35fe64dc053dc515: src/mmw60/ay/golay.py
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 """Golay complementary pairs.
 

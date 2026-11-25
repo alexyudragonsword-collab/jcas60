@@ -16,9 +16,13 @@ Pins
   ``radar_targets`` -- the pedestrian RCS; ``atmosphere`` -- the oxygen
   attenuation).  Every number about the outside world enters here (law 1).
 
-* ``mmw60/`` -- mmw60_trx @ ``cfb401aae3d4271f1ed1146f8c1f182065b26fe7`` (0.3.0):
+* ``mmw60/`` -- mmw60_trx @ ``442fabd99c16b0e6cfc4432d35fe64dc053dc515`` (0.3.0 plus its unreleased
+  ``ay/preamble.py``, mmw60_trx#89):
 
   - ``ay/golay.py`` (the Golay recursion; numpy only),
+  - ``ay/preamble.py`` (the standard single-carrier training field: Gu512 /
+    Gv512 from Ga128 / Gb128, the CEF, its cyclic prefix, the pi/2 rotation;
+    numpy and ``golay.py`` only, the spec_sources entries are its arguments),
   - ``data/spec/survey.yaml`` (its own table: the SC pulse and the converter
     model are read from it by key),
   - ``examples/expected/04_comparison_table.txt`` (its comparison table as
@@ -26,23 +30,20 @@ Pins
 
   ``ay/training.py`` is NOT copied: it builds the OFDM-rate EDMG-STF / EDMG-CEF,
   and it imports mmw60's ``spec`` shim (its local table plus a second, older
-  copy of spec_sources).  The single-carrier Golay training field is built in
-  ``jcas60.field`` from the two spec_sources entries until mmw60_trx#89 lands.
-  ``Frontend60`` is not copied either (milestone 0's boundary: the same
-  numbers, not the same object).
+  copy of spec_sources).  ``Frontend60`` is not copied either (milestone 0's
+  boundary: the same numbers, not the same object).
 
-* ``fmcw_radar/`` -- fmcw_radar @ ``fb0fc165457b4b1ba40e3e777a987f27d842b796`` (0.2.32):
+* ``fmcw_radar/`` -- fmcw_radar @ ``c303566180c2ef22bd2bf6ffaa1f08e59174e110`` (0.2.33):
 
   - ``processing/detection.py``, ``processing/cfar.py``,
     ``processing/windows.py`` (verbatim),
   - ``processing/rd.py`` (adapted: one import line -- ``C0`` comes from this
     package's ``__init__`` instead of fmcw_radar's config schema, which is not
     copied; the ``RadarConfig`` name it also imported is an annotation only),
-  - ``link/compliance.py`` (adapted: the two import lines -- the
-    ``RadarConfig`` annotation import is dropped and ``number`` is
-    ``jcas60.sources.fcc_number``, which answers the same
-    ``fcc15255.<tier>.<field>`` keys from the vendored spec_sources tables
-    instead of fmcw_radar's ``sources.yaml``),
+  - ``link/compliance.py`` (verbatim since fmcw_radar#42: nothing of
+    fmcw_radar is imported when it loads; this library calls its
+    ``check_emission`` with ``jcas60.sources.fcc_number`` as the function
+    that looks a limit up, and never its ``check(cfg)``),
   - ``examples/expected/00_single_target_rd_map.txt`` (its example 00 as
     printed: the two engines' difference is read from it).
 
@@ -52,8 +53,8 @@ Pins
 
 Local changes
 -------------
-None in any body: the three import lines above are the adapted copies' whole
-difference, which ``tools/vendor_check.py`` classifies as such.  A change to
-a vendored body goes upstream first (an issue there), then is re-vendored at
-a new pin.
+None in any body: the one import line of ``processing/rd.py`` is the adapted
+copy's whole difference, which ``tools/vendor_check.py`` classifies as such.
+A change to a vendored body goes upstream first (an issue there), then is
+re-vendored at a new pin.
 """

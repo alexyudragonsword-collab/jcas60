@@ -1,4 +1,4 @@
-# Vendored from mmw60_trx@cfb401aae3d4271f1ed1146f8c1f182065b26fe7: examples/expected/04_comparison_table.txt
+# Vendored from mmw60_trx@442fabd99c16b0e6cfc4432d35fe64dc053dc515: examples/expected/04_comparison_table.txt
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 engine: upclocked wifitrx time-domain baseband (linearised PA / PN models, no cycle-accurate PLL) -- spur / IM conclusions not endorsed
 mmw60 0.3.0; full; one Frontend60 for every row: PA rapp_11ad Psat 14.6 dBm OBO 7.5 dB -> Pout 7.1 dBm, PAE_max 16 %; LO pole_zero IPN -31.1 dBc; converters -0.5 bit/octave from ENOB 10 @ 1 GS/s; EIRP ceiling 40 dBm avg (FCC 15.255)

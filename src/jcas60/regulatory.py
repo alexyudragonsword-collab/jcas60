@@ -10,16 +10,15 @@ that senses with its own waveform is one or the other is not settled here
 are printed.  No row is ever compared at a limit that is not its own.
 
 The radar reading runs fmcw_radar's own check (vendored
-``link/compliance.py``, which holds the rule's structure and reads every
-limit through ``jcas60.sources.fcc_number``) on a description of the ay
-burst: the channel as the occupied band, one sensing packet where the radar
-has one chirp.  The check reads a config object; it is given the few
-attributes it reads and nothing else.
+``link/compliance.py``, verbatim: it holds the rule's structure and takes
+the function that looks a limit up as an argument, here
+``jcas60.sources.fcc_number``) on the ay burst as explicit numbers: the
+channel as the occupied band, one sensing packet where the radar has one
+chirp (``check_emission``, fmcw_radar#42).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from types import SimpleNamespace
 
 from . import sources as S
 from .config import Setup
@@ -50,25 +49,21 @@ def communication(s: Setup) -> Reading:
                    "none in the rule", None, None, None, "devices other than field disturbance sensors")
 
 
-def _view(band_hz, n_bursts: int, burst_s: float, pri_s: float, frame_period_s: float, tx_dbm: Num, backoff_db: float, gain: Num):
-    """What ``compliance.check`` reads of a config, and nothing more."""
-    lo, hi = band_hz
-    values = {"tx_power_dbm": (tx_dbm.value, tx_dbm.tag), "tx_backoff_db": (backoff_db, "derived"), "tx_gain_dbi": (gain.value, gain.tag)}
-    span = (n_bursts - 1) * pri_s + burst_s
-    return SimpleNamespace(
-        band=SimpleNamespace(center_hz=0.5 * (lo + hi), sweep_hz=hi - lo),
-        chirp=SimpleNamespace(n_chirps=n_bursts, pri_s=pri_s, duration_s=burst_s, frame_on_s=span, frame_period_s=frame_period_s),
-        mimo=SimpleNamespace(n_tx=1), regulatory=SimpleNamespace(scenario=None),
-        frontend_value=lambda name: values[name])
-
-
 def radar_check(band_hz, n_bursts: int, burst_s: float, pri_s: float, frame_period_s: float, tx_dbm: Num, gain: Num):
-    """fmcw_radar's check, run twice: at full power to learn the governing tier's cap, then backed off to it."""
-    first = _compliance.check(_view(band_hz, n_bursts, burst_s, pri_s, frame_period_s, tx_dbm, 0.0, gain))
+    """fmcw_radar's check on explicit numbers (``check_emission``), run twice: at full power to learn the governing
+    tier's cap, then backed off to it.  The on-intervals are handed over unmerged: which gaps count as transmitting
+    is each tier's own number."""
+    lo, hi = band_hz
+    on = _compliance.frame_intervals(n_bursts, burst_s, pri_s)
+    tags = {"tx_power_dbm": tx_dbm.tag, "tx_gain_dbi": gain.tag, "tx_backoff_db": "derived"}
+
+    def run(backoff_db: float):
+        return _compliance.check_emission(lo, hi, tx_dbm.value, gain.value, on, number=S.fcc_number, tx_backoff_db=backoff_db,
+                                          frame_period_s=frame_period_s, sources=tags)
+    first = run(0.0)
     if first.eirp_cap_dbm is None:
         return first
-    backoff = max(0.0, tx_dbm.value + gain.value - first.eirp_cap_dbm)
-    return _compliance.check(_view(band_hz, n_bursts, burst_s, pri_s, frame_period_s, tx_dbm, backoff, gain))
+    return run(max(0.0, tx_dbm.value + gain.value - first.eirp_cap_dbm))
 
 
 def radar(s: Setup) -> Reading:

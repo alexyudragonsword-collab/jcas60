@@ -1,4 +1,4 @@
-# Vendored from fmcw_radar@fb0fc165457b4b1ba40e3e777a987f27d842b796: examples/expected/00_single_target_rd_map.txt
+# Vendored from fmcw_radar@c303566180c2ef22bd2bf6ffaa1f08e59174e110: examples/expected/00_single_target_rd_map.txt
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 60 GHz sensing radar: 4 GHz sweep, 100 us chirps x 64, 10 MS/s, hann windows
   TX 12 (source: spec) dBm backed off 8 (source: assumed) dB + 10 (source: assumed) dBi; RX 10 (source: assumed) dBi, NF 12 (source: spec) dB

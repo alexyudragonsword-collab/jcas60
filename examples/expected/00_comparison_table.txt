@@ -105,7 +105,7 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
 
 == 7. a Golay pair's sidelobes when the target moves (waveform simulation: one packet, no noise, target on a chip) ==
    radial velocity [m/s]     peak sidelobe in the zero zone [dBc]    peak [dB]     carrier turn over one sequence [rad]
-                     0.0                                   -281.5       0.0011                                 0.00e+00
+                     0.0                                   -293.0       0.0011                                 0.00e+00
                      2.0                                    -87.9       0.0011                                 1.47e-03
                     12.4                                    -72.1       0.0010                                 9.14e-03
                     50.0                                    -60.0      -0.0009                                 3.69e-02
@@ -253,4 +253,4 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   tgad_em.pn_params#f_pole_hz                                                     1e+06 [spec]
   tgad_em.pn_params#f_zero_hz                                                     1e+08 [spec]
   tgad_em.pn_params#psd0_dbchz                                                      -90 [spec]
-  row A: fmcw_radar@fb0fc16 `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
+  row A: fmcw_radar@c303566 `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
