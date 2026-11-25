@@ -24,6 +24,8 @@ ROW_A = {
     "range_res_m": "radar.range_res_rect_m", "range_width_m": "radar.range_res_m", "range_sidelobe_db": "radar.window_sidelobe_db",
     "range_max_m": "radar.max_range_m", "velocity_res_mps": "radar.velocity_res_mps", "velocity_max_mps": "radar.max_velocity_mps",
     "eirp_dbm": "compliance.eirp_dbm", "snr_db": "detection.snr_cell_db", "pd": "detection.pd", "pfa": "detection.pfa",
+    "snr_required_db": "detection.range_at_pd.snr_required_db", "range_pd_m": "detection.range_at_pd.snr_limited_range_m",
+    "range_actual_m": "detection.range_at_pd.range_m",
     "cap_dbm": "compliance.limit_dbm", "backoff_db": "compliance.tx_backoff_db", "off_time_required_s": "compliance.off_time_required_s",
     "adc_fs_hz": lambda g: g("radar.adc_fs_msps") * 1e6, "adc_bits": "radar.adc_bits",
     "air_fraction": lambda g: g("compliance.frame_on_s") / g("compliance.frame_period_s"),
@@ -44,12 +46,26 @@ def test_row_a_equals_fmcw_radars_report_item_by_item(t):
 
 def test_row_a_cells_not_in_the_report_are_derived_from_it_and_say_so(t):
     a = t["rows"][0]
-    for cell in ("range_pd_m", "processing_gain_db", "loss_mbps"):
-        assert a[cell].tag == "derived"
-    # the range at Pd 0.9: the report's SNR carried out by R^4 and the oxygen term to the required SNR
+    for cell in ("processing_gain_db", "loss_mbps"):
+        assert a[cell].tag == "derived" and "fmcw_radar report" not in a[cell].ref
+    # the range at Pd 0.9 is read from the report since fmcw_radar#42; this library's old extrapolation -- the report's
+    # SNR carried out by R^4 and the oxygen term -- lands on the same figure (the default config has no IF high-pass)
     r = a["range_pd_m"].value
     snr_there = a["snr_db"].value - 40 * __import__("math").log10(r / 5.0) - A.get("inputs.oxygen_db_per_km.value") * 2 * (r - 5.0) / 1e3
-    assert snr_there == pytest.approx(t["snr_required_db"], abs=1e-6)
+    assert snr_there == pytest.approx(a["snr_required_db"].value, abs=1e-6)
+    assert a["range_limited_by"] == "if_band" and a["range_actual_m"].value == a["range_max_m"].value
+
+
+def test_every_row_is_held_to_the_same_required_snr(t):
+    """One criterion for the three ways: the report's CA-CFAR figure; each ay row's range is where its closed-form
+    cell SNR falls to it."""
+    req = t["rows"][0]["snr_required_db"]
+    assert req.value == t["snr_required_db"] == pytest.approx(12.24, abs=0.005)
+    assert t["snr_required_db"] - t["snr_required_known_noise_db"] == pytest.approx(0.49, abs=0.005)
+    s = t["setup"]
+    for r in t["rows"][1:]:
+        at = budget.link(s, r["kind"], r["eirp_dbm"], r["range_pd_m"].value).snr_cell_db.value
+        assert at == pytest.approx(req.value, abs=1e-6), (r["name"], r["limit"])
 
 
 def test_the_recorded_report_is_what_the_pinned_fmcw_radar_writes():
@@ -70,7 +86,7 @@ def test_the_numbers_the_conclusions_quote(t):
            "B width cm": rows[1]["range_width_m"].value * 100, "B clean": rows[1]["range_max_m"].value,
            "need": t["monostatic"][0]["cost"].need_db.value, "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
            "need pn": t["monostatic"][0]["cost"].need_pn_db.value, "air": rows[1]["air_fraction"].value * 100, "air A": rows[0]["air_fraction"].value * 100}
-    want = {"A snr": 43.34, "B comm snr": 30.75, "B radar snr": 28.75, "B comm range": 14.68, "A range": 29.56, "B res cm": 8.52, "A res cm": 3.75,
+    want = {"A snr": 43.34, "B comm snr": 30.75, "B radar snr": 28.75, "B comm range": 14.28, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
             "B width cm": 7.43, "B clean": 10.90, "need": 56.0, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
     for k, v in want.items():
         assert got[k] == pytest.approx(v, abs=0.006 if v < 20 or "snr" in k or "range" in k else 0.06), k

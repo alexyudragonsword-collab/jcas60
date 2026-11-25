@@ -6,20 +6,19 @@
 
 ## 报回上游（本库不改别的库；要它们做的在那个库开 issue，对方合并后本库重新 pin、验收、关 issue）
 
-### spec_sources —— pin 在 `f9ce3f2`；[spec_sources#54](https://github.com/alexyudragonsword-collab/spec_sources/issues/54) 待它答复
-- **802.11bf 在 60 GHz 的感知条目**：用哪些字段、感知包的结构与长度、重复方式、单站 / 双站 / 多站的定义。到之前本库的感知场（L-CEF）、感知包（最短的 SC 包）、一帧 64 个包都是 assumed，措辞守铁律 7。到了之后：按条目重建感知帧，B、C 两行重出，再议措辞。
-- **法规：通信设备顺带感知适用 (c)(1) 还是 (c)(2)**，以及关断时间管不管通信发射。到之前 ay 每行两个版本（EIRP 差 2 dB），雷达读法的空口占比是 1.16 % … 50 % 的区间。到了之后删掉不适用的版本，或把区间收成一个数。
-- 顺带：`itu_p676.gamma_o_dry_sea_level` 补 60.48 GHz 的点（现取 60 GHz 的 14.651 dB/km，`jcas60.oxygen_frequency_ghz`，差 < 0.01 dB）。
-- 里程碑 0 合并后在 #54 回报本库的提交与 vendor 的文件清单（`reader.py` 与 5 张表：ieee80211、regulatory、frontend60、radar_targets、atmosphere），请它登记进 `consumers.yaml`。
+### spec_sources —— pin 在 `f9ce3f2`；[spec_sources#54](https://github.com/alexyudragonsword-collab/spec_sources/issues/54) 答了一半，issue 开着
+- **802.11bf 在 60 GHz 的感知条目**：它读完了公开文件，等用户对照标准核对后另开 PR。到之前本库的感知场（L-CEF）、感知包（最短的 SC 包）、一帧 64 个包都是 assumed，措辞守铁律 7。到了之后：重新 pin，按条目重建感知帧，B、C 两行重出，再议措辞。
+- **那次重新 pin 一并带进来的**（它建议不为这一点单独 pin）：`itu_p676.gamma_o_dry_sea_level` 在 `14e84fd` 已有 60.48 GHz 的点，14.993 dB/km。接入时删掉 `jcas60.oxygen_frequency_ghz`、改读 `@f_ghz=60.48`；5 m 处往返 10 m 动 0.0034 dB，是一次 numbers-move。
+- **法规已答复（2026-11-25），没有定论**：五问里四问“原文没有”，FCC 23-35 没有讨论通信设备用自己的信号做感知；**KDB 没有查到**（检索页对它返回 503）。所以 ay 每行两个版本、雷达读法的空口占比 1.16 % … 50 % 的区间都留着。以后谁读到 KDB 或 FCC 对 WLAN sensing 的说法，在 #54 里补。
+- 本库已登记在它的 `consumers.yaml`（at `8cb40e0`、pin `f9ce3f2`）；重新 pin 后在 #54 回报新的提交。
 
-### mmw60_trx —— pin 在 `cfb401a`；[mmw60_trx#89](https://github.com/alexyudragonsword-collab/mmw60_trx/issues/89) 待它答复
-- **标准的 SC 训练场做成能单独拷的模块**。`ay/training.py` 是 OFDM 包的 EDMG-STF / EDMG-CEF，而且拷不出来（带进它的 `spec` 垫片、本地表与 pin 在 `65ff5e4` 的第二份 spec_sources）；单载波的 L-CEF 它没有按标准拼法建。本库现在自己拼（`field.py`）。它建了之后：vendor 它的、删掉 `field.py` 里的拼法，指纹应逐位不变（同样的码片）。
-- 以后做 OFDM 感知时要 `ay/training.py` 本身：请它把读条目与建波形分开。
+### mmw60_trx —— pin 在 `442fabd`；mmw60_trx#89 已验收
+- 以后做 OFDM 感知时要 `ay/training.py` 本身：它记在自己的 ROADMAP（里程碑 3“按需”），到时在 #89 或新 issue 里说，照 `preamble.py` 的分法拆。
+- L-STF 与 TRN 的组成它也没有公开出处（只有码片数）；有了、经 spec_sources 进来之后它再加，本库再 vendor。
 
-### fmcw_radar —— pin 在 `fb0fc16`；[fmcw_radar#42](https://github.com/alexyudragonsword-collab/fmcw_radar/issues/42) 待它答复
-- **合规检查留一个不读 `RadarConfig` 的入口**。现在 vendor 的 `link/compliance.py` 改了两行 import，`check()` 读配置的那几个属性由 `regulatory._view` 给；它多读一个属性本库要到运行时才知道（`test_law3_the_vendored_check_reproduces_fmcw_radars_own_report` 会红）。
-- **报告里给“按 SNR 的最远探测距离”**。A 行的 29.56 m 是本库由报告的 43.34 dB 按 R⁴ 与氧气项外推的（derived），不含 IF 高通与相噪底随距离的变化。
-- A 行的泄漏：默认配置的报告里 `leakage` 是 null（模型关着），所以表的 §5 对 A 只写“没有建模”。要比两边的隔离需求，得请它在默认配置上开泄漏模型或给一份开着的报告（它的示例 08）。
+### fmcw_radar —— pin 在 `c303566`；fmcw_radar#42 已验收
+- A 行的泄漏：默认配置的报告里 `leakage` 是 null（模型关着），所以表的 §5 对 A 只写“没有建模”。要比两边的隔离需求，得请它在默认配置上开泄漏模型或给一份开着的报告（它的示例 08）。还没有开 issue。
+- B、C 的 CFAR 损失是借 A 行的：三行的 Pd 0.9 距离都用报告的门限 12.24 dB（比噪声电平已知的 11.75 dB 高 0.49 dB，那是 A 行那张加 Hann 窗、4 倍补零的图上的数）。ay 的图不加距离窗、不补零，自己的损失应当更小；要算得 vendor 它的 `processing/cfarstats.py`，而那个文件顶上 import `RadarConfig`（`cfar_statistics_2d` 本身不用它）。换成 11.75 dB 三行都远 2.7–2.8 %。
 
 ## 里程碑 1：阵列与波束扫描下的感知
 

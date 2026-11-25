@@ -32,7 +32,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 RECORD = REPO / "src" / "jcas60" / "data" / "upstream" / "fmcw_radar_budget.json"
-UPSTREAM = {"repo": "fmcw_radar", "sha": "fb0fc165457b4b1ba40e3e777a987f27d842b796",
+UPSTREAM = {"repo": "fmcw_radar", "sha": "c303566180c2ef22bd2bf6ffaa1f08e59174e110",
             "config": "configs/radar_60g_sensing.yaml",
             "command": "python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>"}
 ROOTS = ("/home/user", "/home/user/alexyudragonsword-collab")

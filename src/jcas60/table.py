@@ -37,10 +37,8 @@ def row_a() -> dict:
     g = A.governing_tier()
     pfa = A.rep("detection.pfa", "assumed")
     snr = A.rep("detection.snr_cell_db", unit="dB")
-    o2 = A.rep_input("oxygen_db_per_km", "dB/km")
-    r0 = A.rep_input("range_m", "m")
-    req = B.snr_required_db(setup().pd.value, pfa.value)
-    r_snr = B.range_for_snr(lambda r: snr.value - 4.0 * db(r / r0.value) - o2.value * 2.0 * (r - r0.value) / 1e3, req)
+    if (A.get("detection.range_at_pd.pd"), A.get("detection.range_at_pd.pfa")) != (setup().pd.value, pfa.value):
+        raise ValueError("fmcw_radar's report gives its detection range at another Pd / Pfa than this table's")
     fs, tc, nch = A.rep("radar.adc_fs_msps", "assumed"), A.rep("radar.chirp_us", "assumed"), A.rep("radar.n_chirps", "assumed")
     on, period = A.rep("compliance.frame_on_s", "assumed", "s"), A.rep("compliance.frame_period_s", "assumed", "s")
     rate = R.comm_rate_mbps()
@@ -59,7 +57,9 @@ def row_a() -> dict:
         "processing_what": f"{fs.value * tc.value:.0f} samples x {nch.value:.0f} chirps",
         "window_loss_db": A.budget_term("window loss"),
         "snr_db": snr, "pd": A.rep("detection.pd"), "pfa": pfa,
-        "range_pd_m": derive(r_snr, "report's cell SNR - 40 log10(R / 5 m) - oxygen over 2 (R - 5 m) = SNR for Pd at Pfa", snr, o2, r0, setup().pd, unit="m"),
+        "snr_required_db": A.rep("detection.range_at_pd.snr_required_db", unit="dB"),
+        "range_pd_m": A.rep("detection.range_at_pd.snr_limited_range_m", unit="m"),
+        "range_actual_m": A.rep("detection.range_at_pd.range_m", unit="m"), "range_limited_by": A.get("detection.range_at_pd.limited_by"),
         "two_paths": None, "paths_delta_db": A.engines_difference_db(),
         "rule": A.get("compliance.rule"), "tier": g["label"],
         "cap_dbm": N(g["peak_eirp_limit_dbm"], g["sources"]["peak_eirp_dbm"], "fmcw_radar report: compliance.tiers[governing].peak_eirp_limit_dbm", "dBm"),
@@ -111,7 +111,7 @@ def strong_path_dbm(s: Setup, kind: str, eirp: Num, isolation: Num | None = None
     return derive(eirp.value + s.fe.rx_gain_dbi.value - loss, "EIRP + G_r - (4 pi L / lambda)^2 - oxygen over L", eirp, s.fe.rx_gain_dbi, s.bi_baseline_m, s.carrier_hz, unit="dBm")
 
 
-def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num) -> dict:
+def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num, snr_req: Num) -> dict:
     fe, sim = s.fe, bench.sim
     eirp = reading.eirp_dbm
     link = B.link(s, kind, eirp)
@@ -134,7 +134,7 @@ def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num) -> 
     v_read = _rd.read_peak(sim.velocity_axis(g)[i - 3: i + 4], p_db[i - 3: i + 4, j])["peak_pos"]
     det = sim.cfar(fr, pfa.value)
     jc = (j - (-sim.lag_lo) % sim.osr) // sim.osr
-    r_snr = B.detection_range_m(s, kind, eirp, pfa.value)
+    r_snr = B.detection_range_m(s, kind, eirp, snr_req)
     air = R.air_time(s, reading)
     sim_snr = derive(meas["snr_db"], f"waveform simulation, mean of {bench.frames} frames: peak / floor of the range-Doppler map", eirp, s.n_packets, unit="dB")
     row = {
@@ -291,7 +291,7 @@ def build() -> dict:
     bench = _Bench(s)
     a = row_a()
     comm, radar = R.readings(s)
-    rows = [a] + [row_ay(s, bench, kind, rd_, a["pfa"]) for kind in ("monostatic", "bistatic") for rd_ in (comm, radar)]
+    rows = [a] + [row_ay(s, bench, kind, rd_, a["pfa"], a["snr_required_db"]) for kind in ("monostatic", "bistatic") for rd_ in (comm, radar)]
     v_max = rows[1]["velocity_max_mps"].value
     return {
         "setup": s, "rows": rows, "readings": (comm, radar),
@@ -300,7 +300,10 @@ def build() -> dict:
         "golay": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0)),
         "pulse_sidelobes": pulse_sidelobes(s, bench), "width_measured_chips": measured_width_chips(s, bench),
         "sensitivity": sensitivity(s, comm, a["pfa"].value),
-        "snr_required_db": B.snr_required_db(s.pd.value, a["pfa"].value),
+        "snr_required_db": a["snr_required_db"].value,
+        "snr_required_known_noise_db": B.snr_required_db(s.pd.value, a["pfa"].value),
+        "range_known_noise_m": B.detection_range_m(s, "monostatic", comm.eirp_dbm, derive(B.snr_required_db(s.pd.value, a["pfa"].value),
+                                                   "SNR for Pd at Pfa, noise level known", s.pd, a["pfa"], unit="dB")).value,
         "trace": dict(S.TRACE),
     }
 
@@ -325,7 +328,8 @@ def render(t: dict | None = None) -> str:
     w(ENGINE_BANNER)
     w(f"jcas60 {__version__}; milestone 0: {WORDING}")
     w(f"one target for every row: a person at {s.range_m.show('g')} m receding at {s.velocity_mps.show('g')} m/s, RCS {s.rcs_dbsm.show('g')} dBsm; "
-      f"detection: Pd {s.pd.show('g')} at Pfa {a['pfa'].show('g')}, Swerling 0, noise level known ({t['snr_required_db']:.2f} dB per cell)")
+      f"detection: Pd {s.pd.show('g')} at Pfa {a['pfa'].show('g')}, Swerling 0, at the cell SNR fmcw_radar's report says its map's CA-CFAR needs, "
+      f"{a['snr_required_db'].show('.2f')} dB, for every row (with the noise level known: {t['snr_required_known_noise_db']:.2f} dB)")
     w("tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from "
       "spec numbers, [derived/assumed] computed from at least one assumed number")
     w("")
@@ -366,7 +370,10 @@ def render(t: dict | None = None) -> str:
         w(f"{r['name']:34s} {r['limit']:>20s} {_n(r['eirp_dbm'], '.2f'):>22s} {_n(r['processing_gain_db'], '.2f') + ' dB = ' + r['processing_what']:>40s} "
           f"{_n(r['window_loss_db'], '.2f') + ' dB':>20s} {_n(r['snr_db'], '.2f'):>24s} {r['pd'].value:8.4f} {_n(r['range_pd_m'], '.2f') + ' m':>30s} "
           f"{'yes' if inside else 'no: ' + format(r['range_max_m'].value, '.2f') + ' m':>24s}")
-    w("  SNR(cell): thermal noise only, at the peak (no straddle); row A as its report gives it, its range at Pd 0.9 extrapolated here from that SNR by R^4 and the oxygen term")
+    w(f"  SNR(cell): thermal noise only, at the peak (no straddle).  Row A's range is its report's detection.range_at_pd: {a['range_pd_m'].value:.2f} m by SNR, "
+      f"{a['range_actual_m'].value:.2f} m as the report concludes (limited by: {a['range_limited_by']})")
+    w(f"  the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are "
+      f"{(t['range_known_noise_m'] / rows[1]['range_pd_m'].value - 1.0) * 100:.1f} % longer (row B; {t['range_known_noise_m']:.2f} m)")
     for r in (rows[1], rows[2]):
         gap = a["snr_db"].value - r["snr_db"].value
         chips = 10.0 ** (gap / 10.0) * s.field.n_correlated * s.n_packets.value

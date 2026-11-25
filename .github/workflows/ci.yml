@@ -69,13 +69,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alexyudragonsword-collab/mmw60_trx
-          ref: cfb401aae3d4271f1ed1146f8c1f182065b26fe7
+          ref: 442fabd99c16b0e6cfc4432d35fe64dc053dc515
           path: _siblings/mmw60_trx
       - name: Checkout fmcw_radar (pinned)
         uses: actions/checkout@v4
         with:
           repository: alexyudragonsword-collab/fmcw_radar
-          ref: fb0fc165457b4b1ba40e3e777a987f27d842b796
+          ref: c303566180c2ef22bd2bf6ffaa1f08e59174e110
           path: _siblings/fmcw_radar
       - uses: actions/setup-python@v5
         with:

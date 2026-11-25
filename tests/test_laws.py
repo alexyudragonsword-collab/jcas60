@@ -233,3 +233,12 @@ def test_the_golay_pair_is_complementary_within_the_cyclic_prefix_and_the_recurs
     cyc = lambda x: np.fft.ifft(np.abs(np.fft.fft(x)) ** 2)      # noqa: E731
     alone, pair = np.abs(cyc(u))[1:], np.abs(cyc(u) + cyc(v))[1:]
     assert pair.max() < 1e-9 and alone[:128].max() < 1e-9 and alone.max() > 10
+    # the vendored builder's own chip-rate reading agrees: 1 at lag 0, 0 at every other lag within +-128 chips
+    from jcas60 import sources as S_
+    from jcas60.vendor.mmw60.ay import preamble as P
+    ga, gb = F.tabulated("ga128"), F.tabulated("gb128")
+    gu, gv = P.gu_gv(ga, gb, S_.raw("dmg.cef_golay_layout#gu512"), S_.raw("dmg.cef_golay_layout#gv512"))
+    lags = np.arange(-128, 129)
+    h = P.correlate(f.chips, gu, gv, ["Gu512", "Gv512", "Gv128"], f.n0, lags)
+    assert abs(h[128] - 1) < 1e-12 and np.abs(np.delete(h, 128)).max() < 1e-12
+    assert np.abs(f.chips.real).max() == 1.0 and set(np.unique(np.abs(f.chips.real) + np.abs(f.chips.imag))) == {1.0}   # exact turns

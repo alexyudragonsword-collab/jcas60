@@ -9,13 +9,13 @@ import pytest
 import vendor_check as V
 
 REPO = Path(__file__).resolve().parent.parent
-PINS = {"spec_sources": "f9ce3f2b035d4d83269aa4a4eb33982c53838286", "mmw60_trx": "cfb401aae3d4271f1ed1146f8c1f182065b26fe7",
-        "fmcw_radar": "fb0fc165457b4b1ba40e3e777a987f27d842b796"}
+PINS = {"spec_sources": "f9ce3f2b035d4d83269aa4a4eb33982c53838286", "mmw60_trx": "442fabd99c16b0e6cfc4432d35fe64dc053dc515",
+        "fmcw_radar": "c303566180c2ef22bd2bf6ffaa1f08e59174e110"}
 
 
 def test_every_vendored_file_names_its_upstream_at_a_full_sha():
     files = V.vendored_files()
-    assert len(files) == 15
+    assert len(files) == 16
     for f in files:
         m = V.HEADER.match(f.read_text(encoding="utf-8").splitlines()[0])
         assert m, f
@@ -38,7 +38,7 @@ def test_vendor_check_strict_passes_against_the_siblings():
     results = V.check(sib, {})
     assert V.report(results, strict=True, fail_on_skip=True) == 0
     kinds = {r.rel: r.status for r in results}
-    assert sorted(k for k, v in kinds.items() if v == "adapted") == ["fmcw_radar/link/compliance.py", "fmcw_radar/processing/rd.py"]
+    assert sorted(k for k, v in kinds.items() if v == "adapted") == ["fmcw_radar/processing/rd.py"]
     assert all(v in ("verbatim", "adapted") for v in kinds.values())
 
 
@@ -47,7 +47,14 @@ def test_only_what_is_read_is_vendored():
     names = {str(p.relative_to(V.VENDOR)) for p in V.VENDOR.rglob("*") if p.is_file() and "__pycache__" not in p.parts}
     assert not [n for n in names if "training" in n or "frontend" in n.lower().replace("frontend60.yaml", "") or "schema" in n]
     assert len([n for n in names if n.endswith("reader.py")]) == 1
+    # the regulatory check is copied as it is and never reached through a config object (fmcw_radar#42)
+    own = (REPO / "src/jcas60/regulatory.py").read_text(encoding="utf-8")
+    assert "check_emission(" in own and "_compliance.check(" not in own and "SimpleNamespace" not in own
+    # the vendored preamble builder imports numpy and the Golay module beside it, nothing else (mmw60_trx#89)
+    pre = (V.VENDOR / "mmw60/ay/preamble.py").read_text(encoding="utf-8")
+    imports = [ln for ln in pre.splitlines() if ln.startswith(("import ", "from "))]
+    assert imports == ["from __future__ import annotations", "import numpy as np", "from .golay import golay_pair"]
     used = (REPO / "src/jcas60").glob("*.py")
     text = "\n".join(p.read_text(encoding="utf-8") for p in used)
-    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "ay.golay"):
+    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "ay import preamble"):
         assert mod in text, mod

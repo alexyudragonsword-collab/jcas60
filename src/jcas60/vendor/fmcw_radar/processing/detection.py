@@ -1,4 +1,4 @@
-# Vendored from fmcw_radar@fb0fc165457b4b1ba40e3e777a987f27d842b796: src/fmcw_radar/processing/detection.py
+# Vendored from fmcw_radar@c303566180c2ef22bd2bf6ffaa1f08e59174e110: src/fmcw_radar/processing/detection.py
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 """Detection and false-alarm probability of one cell (statistical).
 
