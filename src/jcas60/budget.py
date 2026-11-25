@@ -171,7 +171,9 @@ def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None) -> Link:
 
 # ----------------------------------------------------------------------------- detection
 def snr_required_db(pd: float, pfa: float) -> float:
-    """The cell SNR a steady target needs for ``pd`` at ``pfa``, noise level known: fmcw_radar's criterion."""
+    """The cell SNR a steady target needs for ``pd`` at ``pfa`` with the noise level known (fmcw_radar's
+    ``snr_for_pd``).  The table's criterion is the one fmcw_radar's report uses instead -- what its map's CA-CFAR
+    needs, 0.49 dB more -- and this figure is printed beside it."""
     return snr_for_pd(pd, pfa)
 
 
@@ -189,10 +191,10 @@ def range_for_snr(snr_of_range, snr_req_db: float, lo: float = 0.5, hi: float = 
     return 0.5 * (lo + hi)
 
 
-def detection_range_m(s: Setup, kind: str, eirp: Num, pfa: float) -> Num:
-    req = snr_required_db(s.pd.value, pfa)
-    r = range_for_snr(lambda x: link(s, kind, eirp, x).snr_cell_db.value, req)
-    return derive(r, "SNR(cell)(R) = SNR for Pd at Pfa", eirp, s.pd, s.fe.nf_db, s.fe.rx_gain_dbi, s.rcs_dbsm, s.n_packets, unit="m")
+def detection_range_m(s: Setup, kind: str, eirp: Num, snr_req_db: Num) -> Num:
+    """The range at which the cell SNR falls to ``snr_req_db`` (the table hands every row the same one)."""
+    r = range_for_snr(lambda x: link(s, kind, eirp, x).snr_cell_db.value, snr_req_db.value)
+    return derive(r, "SNR(cell)(R) = the required SNR", eirp, snr_req_db, s.pd, s.fe.nf_db, s.fe.rx_gain_dbi, s.rcs_dbsm, s.n_packets, unit="m")
 
 
 # ----------------------------------------------------------------------------- phase noise through the correlator

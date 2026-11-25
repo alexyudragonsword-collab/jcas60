@@ -1,6 +1,6 @@
 engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; no PA / LNA nonlinearity) -- compression conclusions are closed-form only
 jcas60 0.1.0; milestone 0: sensing with the 802.11ay waveform (no claim of 802.11bf conformance: spec_sources has no 802.11bf entry yet)
-one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, noise level known (11.75 dB per cell)
+one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, at the cell SNR fmcw_radar's report says its map's CA-CFAR needs, 12.24 [derived/assumed] dB, for every row (with the noise level known: 11.75 dB)
 tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from spec numbers, [derived/assumed] computed from at least one assumed number
 
 == 0. the shared front-end numbers (one instance; row A's own inputs, from its report, beside them) ==
@@ -27,12 +27,13 @@ C  ay SC Golay field, bistatic            1.76 [spec] GHz 9.83 [derived/assumed]
 
 == 2. link: EIRP, processing gain, SNR of the person at 5 m, range at Pd 0.9 ==
 row                                               limit             EIRP [dBm]                          processing gain          window loss           SNR(cell) [dB]       Pd          range at Pd 0.9 (SNR)   within the clean range
-A  FMCW (fmcw_radar default)                radar limit 14.00 [derived/assumed] 48.06 [derived/assumed] dB = 1000 samples x 64 chirps 3.52 [derived/assumed] dB  43.34 [derived/assumed]   1.0000      29.56 [derived/assumed] m              no: 14.99 m
-B  ay SC Golay field, monostatic    communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.68 [derived/assumed] m              no: 10.90 m
-B  ay SC Golay field, monostatic            radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      13.12 [derived/assumed] m              no: 10.90 m
-C  ay SC Golay field, bistatic      communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.68 [derived/assumed] m              no: 13.40 m
-C  ay SC Golay field, bistatic              radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      13.12 [derived/assumed] m                      yes
-  SNR(cell): thermal noise only, at the peak (no straddle); row A as its report gives it, its range at Pd 0.9 extrapolated here from that SNR by R^4 and the oxygen term
+A  FMCW (fmcw_radar default)                radar limit 14.00 [derived/assumed] 48.06 [derived/assumed] dB = 1000 samples x 64 chirps 3.52 [derived/assumed] dB  43.34 [derived/assumed]   1.0000      28.78 [derived/assumed] m              no: 14.99 m
+B  ay SC Golay field, monostatic    communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 10.90 m
+B  ay SC Golay field, monostatic            radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      12.76 [derived/assumed] m              no: 10.90 m
+C  ay SC Golay field, bistatic      communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 13.40 m
+C  ay SC Golay field, bistatic              radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      12.76 [derived/assumed] m                      yes
+  SNR(cell): thermal noise only, at the peak (no straddle).  Row A's range is its report's detection.range_at_pd: 28.78 m by SNR, 14.99 m as the report concludes (limited by: if_band)
+  the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are 2.8 % longer (row B; 14.68 m)
   row A over row B, communication limit: +12.59 dB with 8 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x18.2 the chips, 0.68 ms a frame (2.0 % of the time, training alone)
   row A over row B, radar limit: +14.59 dB with 6 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x28.8 the chips, 1.07 ms a frame (3.2 % of the time, training alone)
   the ay budget, monostatic at 22 dBm: spreading 107.03 dB, oxygen 0.15 dB, echo -85.18 dBm, noise in 1.76 GHz -69.52 dBm, SNR per chip -15.66 dB

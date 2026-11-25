@@ -5,18 +5,18 @@ summary: "里程碑 0 的对照表回答的三个问题——分辨率与探测�
 tags: [jcas60, comparison, fmcw, 802.11ay, golay, monostatic, regulatory]
 contains: [decision, lesson, scope]
 created: "2026-11-24"
-updated: "2026-11-24"
+updated: "2026-11-25"
 related: [architecture-invariants.md]
 authoring_mode: ai_generated
 ---
 
 # 对照表：FMCW 对“用 ay 波形做感知”（里程碑 0）
 
-数字出自 `examples/expected/00_comparison_table.txt`（`python examples/00_comparison_table.py` 重出；下文的 §n 指它的第 n 节）。目标：5 m 处远离的人体，2 m/s，RCS −10 dBsm。三行共用一套前端数字（发 12 dBm、收发天线各 10 dBi、NF 12 dB），A 行是 fmcw_radar@`fb0fc16` 默认配置的报告原样。本库的说法是“用 ay 波形做感知”，不说“符合 802.11bf”（铁律 7）。
+数字出自 `examples/expected/00_comparison_table.txt`（`python examples/00_comparison_table.py` 重出；下文的 §n 指它的第 n 节）。目标：5 m 处远离的人体，2 m/s，RCS −10 dBsm。三行共用一套前端数字（发 12 dBm、收发天线各 10 dBi、NF 12 dB），A 行是 fmcw_radar@`c303566` 默认配置的报告原样。本库的说法是“用 ay 波形做感知”，不说“符合 802.11bf”（铁律 7）。
 
 ## 问题 1：分辨率和探测距离，通信波形能不能赢过 FMCW？
 
-**结论：这一轮的配置下都赢不了。距离分辨率粗 2.27 倍（8.52 对 3.75 cm，c/2B），5 m 人体的 SNR 低 12.6 dB（通信限值读法）或 14.6 dB（雷达限值读法），Pd 0.9 的最远距离 14.7 / 13.1 m 对 29.6 m（按 SNR），干净的距离窗 10.9 m 对 15.0 m。**
+**结论：这一轮的配置下都赢不了。距离分辨率粗 2.27 倍（8.52 对 3.75 cm，c/2B），5 m 人体的 SNR 低 12.6 dB（通信限值读法）或 14.6 dB（雷达限值读法），Pd 0.9 的最远距离 14.3 / 12.8 m 对 28.8 m（按 SNR），干净的距离窗 10.9 m 对 15.0 m。**
 
 | | A：FMCW | B：ay 单站，通信限值 | B：ay 单站，雷达限值 |
 |---|---:|---:|---:|
@@ -27,7 +27,7 @@ authoring_mode: ai_generated
 | EIRP | 14 dBm | 22 dBm | 20 dBm |
 | 处理增益 | 48.06 dB（1000 × 64） | 48.16 dB（1024 × 64） | 48.16 dB |
 | SNR（5 m） | 43.34 dB | 30.75 dB | 28.75 dB |
-| Pd 0.9 的距离（按 SNR） | 29.56 m | 14.68 m | 13.12 m |
+| Pd 0.9 的距离（按 SNR，门限 12.24 dB） | 28.78 m | 14.28 m | 12.76 m |
 | 干净的距离窗 | 14.99 m（IF 带宽） | 10.90 m（128 码片循环前缀） | 10.90 m |
 
 前提与读法：
@@ -36,11 +36,12 @@ authoring_mode: ai_generated
 - **“更高的 EIRP 上限”单天线用不上**：通信限值是平均 40 dBm，但这套前端满功率只有 12 + 10 = 22 dBm。ay 比 FMCW 多的是 8 dB（通信读法）或 6 dB（雷达读法：信道 2 落在 57–61.56 GHz 档，带关断时间 20 dBm），不是 26 dB。要靠阵列才够得着 40 dBm（里程碑 1）。
 - **输在照射时间上**：FMCW 一帧在目标上 6.4 ms，ay 一帧参与相关的码片只有 1024 × 64 ÷ 1.76 GHz = 37.2 µs。EIRP 多 8 dB、照射时间少 22.4 dB、FMCW 的距离窗多丢 1.76 dB，合计 −12.6 dB。要追平 FMCW 的 SNR，相关的码片得 ×18.2，即每帧 0.68 ms 的训练场，占 2.0 % 的时间（雷达读法 ×28.8，3.2 %）——仍远少于 FMCW 的 19.2 %。**按“每单位空口时间换到的 SNR”算，通信波形反而高**；这一轮的短包只是没花那么多时间。
 - **6 dB 的雷达读法优势有一半是频段位置给的**：fmcw_radar 默认扫 58–62 GHz，跨过 61.56 GHz，只能用 57–64 GHz 档的 14 dBm。同样 4 GHz 的扫频挪到 57–61 GHz，同一个检查给 20 dBm（关断 16.5 ms，一帧留 26.6 ms）。这是 A 行默认配置的选择，不是波形的性质；A 行按用户定的默认配置不动。
+- **Pd 0.9 的距离三行同一个门限**：fmcw_radar 的报告给的 12.24 dB（它那张图上 CA-CFAR 要的格点 SNR，比噪声电平已知的 11.75 dB 高 0.49 dB）。A 行直接读报告（`detection.range_at_pd`：按 SNR 28.78 m，报告自己的结论是 14.99 m，被 IF 带宽截住）；B、C 用同一个门限，它们自己那张图上的 CFAR 损失没有算（`jcas60.detection`）。换成 11.75 dB 三行都远 2.7–2.8 %（更正 2026-11-25：合并时的版本三行都用 11.75 dB，A 行的 29.56 m 是本库由报告的 SNR 外推的；fmcw_radar#42 之后改读报告）。
 - 双站（C）在这组几何下 SNR 与单站相同（两条腿都是 5 m），分辨率沿双站角平分线粗 1 / cos 30° = 1.15 倍。
 
 两条路：闭式（格点上）对波形级，B 两个版本差 −0.05 / −0.06 dB，C 两个版本 −0.14 / −0.10 dB（§3）；A 行是 fmcw_radar 自己两个引擎的 +0.03 dB。波形级读到的目标位置 5.006 m、+1.99 m/s，CA-CFAR 都检出。
 
-**Golay 旁瓣在多普勒下抬到多少**（§7，波形级，单包无噪声）：0 m/s 时 −281.5 dBc（双精度下的严格抵消），2 m/s −87.9 dBc，12.4 m/s（不模糊速度）−72.1 dBc，50 m/s −60.0 dBc，200 m/s −47.9 dBc，每十倍速度 20 dB。Gu512、Gv512 在同一个包里前后相接（相隔 512 码片 = 0.29 µs），载波在一段序列里只转 1.5 mrad（2 m/s）：对人体速度，互补对的旁瓣不是问题。我跑之前估的是 −60 到 −70 dBc，高估了约 20 dB。
+**Golay 旁瓣在多普勒下抬到多少**（§7，波形级，单包无噪声）：0 m/s 时 −293.0 dBc（双精度下的严格抵消；用 exp 算旋转时是 −281.5 dBc，换成 mmw60_trx 的精确旋转后更低），2 m/s −87.9 dBc，12.4 m/s（不模糊速度）−72.1 dBc，50 m/s −60.0 dBc，200 m/s −47.9 dBc，每十倍速度 20 dB。Gu512、Gv512 在同一个包里前后相接（相隔 512 码片 = 0.29 µs），载波在一段序列里只转 1.5 mrad（2 m/s）：对人体速度，互补对的旁瓣不是问题。我跑之前估的是 −60 到 −70 dBc，高估了约 20 dB。
 
 **循环前缀之内，旁瓣为零靠的是 Ga128 / Gb128，不是 Gu / Gv 这一对。** Gu512、Gv512 各由四段带符号的 Ga128 / Gb128 拼成，128 码片以内的循环自相关各自单独就是零；两段相加换来的是 3 dB 的处理增益和 128 码片以外的抵消（单独一段从第 129 码片起有 48 / 512 = −20.6 dB 的旁瓣，一对相加后全部 511 个时延上为零）。这是 break-check 发现的：把 Gv512 换成 Gu512 再发一遍，原来的测试没有红，两条路的差也只动到 −0.13 dB；测试已补上“全部时延上互补”的断言。
 
@@ -75,8 +76,8 @@ authoring_mode: ai_generated
 
 - **共用的前端数字取 fmcw_radar 默认配置用的那一组**（雷达芯片的发射功率与 NF、10 dBi 天线），不取 mmw60_trx 的通信前端预设。原因：A 行要直接用 fmcw_radar 的报告、不重算，而铁律 2 要三行同一组数，两条合起来只有这一种取法。换成通信收发机的数（2 dBi 天线、NF 6.1 dB、发射 P1dB 5.4 dBm），B 行 SNR 是 14.05 dB（−16.7 dB），见 §8；那时 A 行得用 fmcw_radar 的工具重出。
 - **本振是三行里唯一不共用的前端量**：FMCW 的本振就是出 chirp 的 ADPLL。ay 行用 TGad 评估方法学的相噪模型（`tgad_em.pn_params`）。
-- **感知场取 L-CEF，不取 `ay/training.py` 的场**：后者是 OFDM 包的 EDMG-STF / EDMG-CEF（2.64 GHz、频域序列），单载波单流包里没有；而且它拷不出来（带进 mmw60 的垫片与第二份 spec_sources）。L-CEF 由本库照 `dmg.golay_sequences`、`dmg.cef_golay_layout` 拼，等 mmw60_trx#89。
-- **法规没有定论，两种读法都是行**（铁律 3）；雷达读法直接跑 fmcw_radar 自己的检查（vendored），它在 fmcw_radar 默认帧上逐档复现它的报告。
+- **感知场取 L-CEF，不取 `ay/training.py` 的场**：后者是 OFDM 包的 EDMG-STF / EDMG-CEF（2.64 GHz、频域序列），单载波单流包里没有；而且它拷不出来（带进 mmw60 的垫片与第二份 spec_sources）。L-CEF 由 mmw60_trx 的 `ay/preamble.py` 建（mmw60_trx#89 之后 vendor；之前是本库自己拼的），`dmg.golay_sequences`、`dmg.cef_golay_layout` 两条由本库读出、当参数传给它。
+- **法规没有定论，两种读法都是行**（铁律 3）；雷达读法直接跑 fmcw_radar 自己的检查（vendored，fmcw_radar#42 之后逐字、经 `check_emission`），它在 fmcw_radar 默认帧上逐档复现它的报告。spec_sources#54 的答复（2026-11-25）：五问里四问“原文没有”，FCC 23-35 没有讨论通信设备用自己的信号做感知，KDB 没有查到——所以两种读法继续都是行。它顺带读到两条背景：FCC 当时没有采纳“带感知技术的雷达用 WLAN 限值”的提议（第 49–50 段）；合规测量里的占用带宽是实测值（第 62 段），本库按整个 2.16 GHz 信道算是偏保守的一侧，档位不变。
 
 ## 没有覆盖的
 
