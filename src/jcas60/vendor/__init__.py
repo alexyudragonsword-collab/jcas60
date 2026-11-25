@@ -8,13 +8,16 @@ and what they import, are copied; code outside this tree imports them through
 
 Pins
 ----
-* ``spec_sources/`` -- spec_sources @ ``f9ce3f2b035d4d83269aa4a4eb33982c53838286``:
+* ``spec_sources/`` -- spec_sources @ ``0d17de6440344832737140ecfcdbf96b175a042a``:
   the reader and five tables (``ieee80211`` -- the Golay sequences, the CEF
   layout, the EDMG SC numbers and PPDU lengths, the DMG timing; ``regulatory``
   -- 47 CFR 15.255, the communication limits and the radar tiers;
   ``frontend60`` -- the 60 GHz radar chip's figures and the TX-RX isolation;
   ``radar_targets`` -- the pedestrian RCS; ``atmosphere`` -- the oxygen
-  attenuation).  Every number about the outside world enters here (law 1).
+  attenuation, with a point at 60.48 GHz since this pin).  ``ieee80211`` also
+  holds the 802.11bf entries of spec_sources#54 (sensing types, scheduling,
+  PPDUs, bandwidth, the TRN fields), which ``jcas60.bf`` checks the sensing
+  frame against.  Every number about the outside world enters here (law 1).
 
 * ``mmw60/`` -- mmw60_trx @ ``442fabd99c16b0e6cfc4432d35fe64dc053dc515`` (0.3.0 plus its unreleased
   ``ay/preamble.py``, mmw60_trx#89):

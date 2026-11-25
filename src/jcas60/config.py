@@ -101,9 +101,7 @@ def setup() -> Setup:
     fields = S.raw("jcas60.sensing_packet#fields")
     chips = [S.num(f"edmg.sc_siso_preamble#{f}", "chips") for f in fields]
     packet = derive(sum(c.value for c in chips), " + ".join(fields), *chips, S.num("jcas60.sensing_packet#data_blocks"), unit="chips")
-    o2_f = S.num("jcas60.oxygen_frequency_ghz")
-    o2 = S.num(f"itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz={o2_f.value:g}", "dB/km")
-    oxygen = derive(o2.value, o2.ref, o2, o2_f, unit="dB/km")
+    oxygen = S.num(f"itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz={carrier.value / 1e9:g}", "dB/km")     # at the channel's centre
     if str(S.raw("assumed.ay_sc_pulse#shape")) != "root-raised-cosine":
         raise ValueError("mmw60_trx's SC pulse is no longer a root-raised cosine: jcas60's pulse model does not fit it")
     sim = {k: S.raw(f"jcas60.sim#{k}") for k in ("seed", "frames_averaged", "buffer_chips", "exclude_doppler_bins",

@@ -9,7 +9,7 @@ import pytest
 import vendor_check as V
 
 REPO = Path(__file__).resolve().parent.parent
-PINS = {"spec_sources": "f9ce3f2b035d4d83269aa4a4eb33982c53838286", "mmw60_trx": "442fabd99c16b0e6cfc4432d35fe64dc053dc515",
+PINS = {"spec_sources": "0d17de6440344832737140ecfcdbf96b175a042a", "mmw60_trx": "442fabd99c16b0e6cfc4432d35fe64dc053dc515",
         "fmcw_radar": "c303566180c2ef22bd2bf6ffaa1f08e59174e110"}
 
 

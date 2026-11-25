@@ -1,5 +1,5 @@
 engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; no PA / LNA nonlinearity) -- compression conclusions are closed-form only
-jcas60 0.1.0; milestone 0: sensing with the 802.11ay waveform (no claim of 802.11bf conformance: spec_sources has no 802.11bf entry yet)
+jcas60 0.1.0; milestone 0: sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11 holds what was checked against spec_sources' 802.11bf entries, item by item)
 one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, at the cell SNR fmcw_radar's report says its map's CA-CFAR needs, 12.24 [derived/assumed] dB, for every row (with the noise level known: 11.75 dB)
 tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from spec numbers, [derived/assumed] computed from at least one assumed number
 
@@ -28,20 +28,20 @@ C  ay SC Golay field, bistatic            1.76 [spec] GHz 9.83 [derived/assumed]
 == 2. link: EIRP, processing gain, SNR of the person at 5 m, range at Pd 0.9 ==
 row                                               limit             EIRP [dBm]                          processing gain          window loss           SNR(cell) [dB]       Pd          range at Pd 0.9 (SNR)   within the clean range
 A  FMCW (fmcw_radar default)                radar limit 14.00 [derived/assumed] 48.06 [derived/assumed] dB = 1000 samples x 64 chirps 3.52 [derived/assumed] dB  43.34 [derived/assumed]   1.0000      28.78 [derived/assumed] m              no: 14.99 m
-B  ay SC Golay field, monostatic    communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 10.90 m
-B  ay SC Golay field, monostatic            radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      12.76 [derived/assumed] m              no: 10.90 m
-C  ay SC Golay field, bistatic      communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.75 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 13.40 m
-C  ay SC Golay field, bistatic              radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.75 [derived/assumed]   1.0000      12.76 [derived/assumed] m                      yes
+B  ay SC Golay field, monostatic    communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 10.90 m
+B  ay SC Golay field, monostatic            radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m              no: 10.90 m
+C  ay SC Golay field, bistatic      communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 13.40 m
+C  ay SC Golay field, bistatic              radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m                      yes
   SNR(cell): thermal noise only, at the peak (no straddle).  Row A's range is its report's detection.range_at_pd: 28.78 m by SNR, 14.99 m as the report concludes (limited by: if_band)
-  the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are 2.8 % longer (row B; 14.68 m)
-  row A over row B, communication limit: +12.59 dB with 8 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x18.2 the chips, 0.68 ms a frame (2.0 % of the time, training alone)
-  row A over row B, radar limit: +14.59 dB with 6 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x28.8 the chips, 1.07 ms a frame (3.2 % of the time, training alone)
+  the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are 2.8 % longer (row B; 14.67 m)
+  row A over row B, communication limit: +12.60 dB with 8 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x18.2 the chips, 0.68 ms a frame (2.0 % of the time, training alone)
+  row A over row B, radar limit: +14.60 dB with 6 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x28.8 the chips, 1.07 ms a frame (3.2 % of the time, training alone)
   the ay budget, monostatic at 22 dBm: spreading 107.03 dB, oxygen 0.15 dB, echo -85.18 dBm, noise in 1.76 GHz -69.52 dBm, SNR per chip -15.66 dB
 
 == 3. the two roads (law 4): closed form against waveform simulation ==
 row                                               limit    closed, on the grid             simulation   difference   straddle                    read at   CA-CFAR  static path in the simulation
 A  FMCW (fmcw_radar default)                radar limit                      —                      —      +0.03 dB                                                  fmcw_radar's own two engines (time - statistical), from its example 00 as printed
-B  ay SC Golay field, monostatic    communication limit               29.87 dB               29.83 dB      -0.05 dB    0.87 dB         5.006 m, +1.99 m/s  detected  leakage at -28.0 dBm
+B  ay SC Golay field, monostatic    communication limit               29.87 dB               29.82 dB      -0.05 dB    0.87 dB         5.006 m, +1.99 m/s  detected  leakage at -28.0 dBm
 B  ay SC Golay field, monostatic            radar limit               27.87 dB               27.81 dB      -0.06 dB    0.87 dB         5.006 m, +1.98 m/s  detected  leakage at -30.0 dBm
 C  ay SC Golay field, bistatic      communication limit               29.37 dB               29.23 dB      -0.14 dB    1.37 dB         5.004 m, +2.00 m/s  detected  direct path at -50.1 dBm
 C  ay SC Golay field, bistatic              radar limit               27.37 dB               27.27 dB      -0.10 dB    1.37 dB         5.004 m, +2.01 m/s  detected  direct path at -52.1 dBm
@@ -71,11 +71,11 @@ C  ay SC Golay field, bistatic     3520 [derived/assumed] MS/s    2 (I and Q)   
       have 20 [derived] dB, antenna arrays without EBG (low end): short by 36.0 dB; leakage -8 dBm; ENOB needed 12.39
           both roads, floor rise: ADC closed 14.18 dB / simulated 9.24 dB; LO phase noise closed 17.20 dB / simulated 17.29 dB
           the ADC's error: thermal noise is 0.06 LSB rms, 69 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 9.25 dB, the rest is the zero-Doppler ridge
-          simulation, linear receiver and ideal ADC: SNR 29.83 dB with the leakage, 29.79 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.1 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -1.00 dB
+          simulation, linear receiver and ideal ADC: SNR 29.82 dB with the leakage, 29.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.1 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -1.00 dB
       have 40 [spec] dB, antenna arrays with EBG: short by 16.0 dB; leakage -28 dBm; ENOB needed 9.07
           both roads, floor rise: ADC closed 0.97 dB / simulated 0.98 dB; LO phase noise closed 1.80 dB / simulated 1.85 dB
           the ADC's error: thermal noise is 0.58 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.96 dB, the rest is the zero-Doppler ridge
-          simulation, linear receiver and ideal ADC: SNR 29.83 dB with the leakage, 29.79 dB without; with the ADC the zero-Doppler ridge at the target's range is -114.6 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -0.06 dB
+          simulation, linear receiver and ideal ADC: SNR 29.82 dB with the leakage, 29.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -114.6 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -0.06 dB
   B, radar limit (conducted 10 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
       in-band compression    54.0 dB [derived/assumed]  (leakage 10 dB under the in-band P1dB; 44.0 dB to sit at P1dB itself)   closed form only
       ADC quantisation       37.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
@@ -84,11 +84,11 @@ C  ay SC Golay field, bistatic     3520 [derived/assumed] MS/s    2 (I and Q)   
       have 20 [derived] dB, antenna arrays without EBG (low end): short by 34.0 dB; leakage -10 dBm; ENOB needed 12.06
           both roads, floor rise: ADC closed 12.27 dB / simulated 8.39 dB; LO phase noise closed 15.25 dB / simulated 15.34 dB
           the ADC's error: thermal noise is 0.07 LSB rms, 61 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 8.40 dB, the rest is the zero-Doppler ridge
-          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.9 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.65 dB
+          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.77 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.9 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.65 dB
       have 40 [spec] dB, antenna arrays with EBG: short by 14.0 dB; leakage -30 dBm; ENOB needed 8.74
           both roads, floor rise: ADC closed 0.64 dB / simulated 0.67 dB; LO phase noise closed 1.22 dB / simulated 1.26 dB
           the ADC's error: thermal noise is 0.72 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.63 dB, the rest is the zero-Doppler ridge
-          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -115.0 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.04 dB
+          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.77 dB without; with the ADC the zero-Doppler ridge at the target's range is -115.0 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.04 dB
   B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), communication limit: 30 dB gain: NF 15.6 dB, P1dB -24 dBm, needs 46 dB; 36 dB gain: NF 12.2 dB, P1dB -30 dBm, needs 52 dB; 40 dB gain: NF 11 dB, P1dB -34 dBm, needs 56 dB; 44 dB gain: NF 10.5 dB, P1dB -38 dBm, needs 60 dB; 48 dB gain: NF 10.3 dB, P1dB -42 dBm, needs 64 dB
   C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -1.06 dB)
   C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.83 dB)
@@ -114,11 +114,11 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   0 m/s is the pair's exact cancellation at double precision; 12.4 m/s is the unambiguous velocity of section 1
 
 == 8. sensitivity: row B under the communication limit, closed form, one choice changed at a time ==
-  packets per frame x 2 (jcas60.sensing_burst)                                                  +3.01 dB -> SNR(cell)  33.76 dB   velocity resolution twice as fine, air time x 2
-  rectangular Doppler window (jcas60.doppler_window)                                            +1.76 dB -> SNR(cell)  32.51 dB   Doppler sidelobes -13 dB instead of -31 dB
-  the L-STF correlated as well (jcas60.sensing_field)                                           +4.95 dB -> SNR(cell)  35.70 dB   its composition has no public source
-  RCS at the top of the pedestrian range (target_rcs.deep2019_pedestrian_77g#co_pol_max_dbsm)  +15.00 dB -> SNR(cell)  45.75 dB   all three rows move together
-  the communication transceiver's numbers (rx60.comm_asada2011: antenna, NF, TX P1dB)          -16.70 dB -> SNR(cell)  14.05 dB   antennas -16.0 dB, NF +5.9 dB, TX power -6.6 dB; row A is not recomputed on them
+  packets per frame x 2 (jcas60.sensing_burst)                                                  +3.01 dB -> SNR(cell)  33.75 dB   velocity resolution twice as fine, air time x 2
+  rectangular Doppler window (jcas60.doppler_window)                                            +1.76 dB -> SNR(cell)  32.50 dB   Doppler sidelobes -13 dB instead of -31 dB
+  the L-STF correlated as well (jcas60.sensing_field)                                           +4.95 dB -> SNR(cell)  35.69 dB   its composition has no public source
+  RCS at the top of the pedestrian range (target_rcs.deep2019_pedestrian_77g#co_pol_max_dbsm)  +15.00 dB -> SNR(cell)  45.74 dB   all three rows move together
+  the communication transceiver's numbers (rx60.comm_asada2011: antenna, NF, TX P1dB)          -16.70 dB -> SNR(cell)  14.04 dB   antennas -16.0 dB, NF +5.9 dB, TX power -6.6 dB; row A is not recomputed on them
 
 == 9. this library's own choices (every entry of data/assumed.yaml; what would move is in each entry's note) ==
   jcas60.antenna_gain_dbi          {'tx': 10.0, 'rx': 10.0}  [assumed]
@@ -133,7 +133,6 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.compression_margin_db     10.0  [assumed]
   jcas60.leakage_delay_s           1e-10  [assumed]
   jcas60.lo_phase_noise            tgad_em.pn_params 的单极点单零点模型，每台设备一个本振  [assumed]
-  jcas60.oxygen_frequency_ghz      60.0  [assumed]
   jcas60.target                    {'range_m': 5.0, 'velocity_mps': 2.0}  [assumed]
   jcas60.detection                 {'pd': 0.9}  [assumed]
   jcas60.bistatic_geometry         {'r_tx_m': 5.0, 'r_rx_m': 5.0, 'baseline_m': 5.0}  [assumed]
@@ -206,9 +205,22 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   fcc15255.radar_uav_60_64#peak_eirp_dbm                                             20 [spec]
   ieee80211ay.channel_centres_ghz                                                       [spec]
   ieee80211ay.channel_centres_ghz[2]                                          6.048e+10 [spec]
+  ieee80211bf.dmg_monostatic_ppdu#ppdu                                                  [spec]
+  ieee80211bf.dmg_monostatic_ppdu#trn_based_sensing                                     [spec]
+  ieee80211bf.dmg_sensing_bandwidth#dmg_non_edmg                                        [spec]
+  ieee80211bf.dmg_sensing_bandwidth#multistatic_channel_ghz                             [spec]
+  ieee80211bf.dmg_sensing_scheduling#octets@field=interburst_interval                 2 [spec]
+  ieee80211bf.dmg_sensing_scheduling#octets@field=intraburst_interval                 1 [spec]
+  ieee80211bf.dmg_sensing_scheduling#octets@field=number_of_instances_per_burst            1 [spec]
+  ieee80211bf.dmg_sensing_scheduling#time_unit_s                                  1e-06 [spec]
+  ieee80211bf.dmg_sensing_types#full_duplex_requirement                                 [spec]
+  ieee80211bf.dmg_sensing_types#receiver@type=bistatic                                  [spec]
+  ieee80211bf.dmg_sensing_types#receiver@type=monostatic                                [spec]
+  ieee80211bf.dmg_sensing_types#transmitter@type=bistatic                               [spec]
+  ieee80211bf.dmg_sensing_types#transmitter@type=monostatic                             [spec]
   isolation.tx_rx_tue2018#with_ebg_db                                                40 [spec]
   isolation.tx_rx_tue2018_no_ebg_min_db                                              20 [derived]
-  itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz=60                              14.651 [derived]
+  itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz=60.48                           14.993 [derived]
   jcas60.adc#desense_allowed_db                                                       1 [assumed]
   jcas60.adc#samples_per_chip                                                         2 [assumed]
   jcas60.antenna_gain_dbi#rx                                                         10 [assumed]
@@ -223,7 +235,6 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.detection#pd                                                               0.9 [assumed]
   jcas60.doppler_window                                                                 [assumed]
   jcas60.leakage_delay_s                                                          1e-10 [assumed]
-  jcas60.oxygen_frequency_ghz                                                        60 [assumed]
   jcas60.packet_overhead#sifs_per_packet                                              1 [assumed]
   jcas60.rx_gain_db                                                                  40 [assumed]
   jcas60.sensing_burst#frames_per_s                                                  30 [assumed]
@@ -255,3 +266,26 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   tgad_em.pn_params#f_zero_hz                                                     1e+08 [spec]
   tgad_em.pn_params#psd0_dbchz                                                      -90 [spec]
   row A: fmcw_radar@c303566 `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
+
+== 11. the ay sensing frame against spec_sources' 802.11bf entries, item by item (law 7; the entries are from the task group's public documents) ==
+  B     who transmits and who receives         fits                     here: one device transmits the packet and correlates its own echo
+                                                                        entry (ieee80211bf.dmg_sensing_types): monostatic: transmitter the sensing STA itself, receiver the same STA
+  B     receiving while transmitting           left open by the entry   here: the receiver is on during the packet (section 5 is what that costs)
+                                                                        entry (ieee80211bf.dmg_sensing_types): full-duplex requirement: not stated
+  B     the PPDU                               fits                     here: a single-channel EDMG SC PPDU of 5376 chips: preamble and the two headers, no data, no TRN field
+                                                                        entry (ieee80211bf.dmg_monostatic_ppdu): any DMG or EDMG PPDU
+  B     the field the channel is read on       left open by the entry   here: the L-CEF (jcas60.sensing_field)
+                                                                        entry (ieee80211bf.dmg_monostatic_ppdu): sensing on the TRN field: optional (monostatic and coordinated monostatic); which field otherwise is not a value of the entry
+  C     who transmits and who receives         fits                     here: one device transmits, the other correlates
+                                                                        entry (ieee80211bf.dmg_sensing_types): bistatic: transmitter the initiator or the responder, receiver the other of the two
+  C     the PPDU                               no entry                 here: the same plain SC PPDU as row B, read on its L-CEF
+                                                                        entry (ieee80211bf.dmg_sensing_types): the entries give a PPDU for the monostatic types and for the multistatic type, none for the bistatic type
+  B, C  packets of one frame, start to start   fits                     here: 100 us
+                                                                        entry (ieee80211bf.dmg_sensing_scheduling): intraburst interval: 1 octet, in us: at most 255 us
+  B, C  frames, start to start                 fits                     here: 33333.33 us (not a whole number of us: 33333 us is 30.0003 frames a second)
+                                                                        entry (ieee80211bf.dmg_sensing_scheduling): interburst interval: 2 octets, in us: at most 65535 us
+  B, C  packets per frame                      fits                     here: 64, taking one packet for one measurement exchange
+                                                                        entry (ieee80211bf.dmg_sensing_scheduling): measurement exchanges per burst: 1 octet: at most 255
+  B, C  bandwidth                              left open by the entry   here: one 2.16 GHz channel
+                                                                        entry (ieee80211bf.dmg_sensing_bandwidth): sensing by a non-EDMG DMG STA limited to one 2.16 GHz channel: not stated; multistatic on [4.32, 6.48, 8.64] GHz channels
+  this is not a statement of conformance: no sensing session, measurement exchange or frame of the procedure is built here, and the standard itself was not read

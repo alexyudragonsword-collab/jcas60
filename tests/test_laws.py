@@ -71,7 +71,7 @@ ALLOWED = {
     "budget.py": {1.5, 4001, 2001, 6001, 2000.0, 80, 60},        # 1.5 = SQNR of a full-scale complex tone; grid sizes; bisection bounds
     "wavesim.py": {16, 64},                                      # the phase-noise grid's length in buffers; pulse-tail guard in chips
     "table.py": {0.75, 97, 3.0103, 1e-40, 100, 180, 34, 92},    # scan grids, -3 dB, formatting widths
-    "config.py": set(), "frontend.py": set(), "field.py": set(), "regulatory.py": set(), "fmcw_row.py": set(), "sources.py": set(),
+    "config.py": set(), "frontend.py": set(), "field.py": set(), "regulatory.py": set(), "fmcw_row.py": set(), "sources.py": set(), "bf.py": set(),
     "__init__.py": set(),
 }
 
@@ -108,8 +108,12 @@ def test_law2_row_a_ran_on_the_same_numbers():
     fe, s = frontend.shared(), config.setup()
     for mine, name in ((fe.tx_power_dbm, "tx_power_dbm"), (fe.tx_gain_dbi, "tx_gain_dbi"), (fe.rx_gain_dbi, "rx_gain_dbi"), (fe.nf_db, "nf_db"),
                        (fe.rx_gain_db, "rx_gain_db"), (fe.p1db_inband_dbm, "p1db_inband_dbm"), (s.rcs_dbsm, "rcs_dbsm"),
-                       (s.oxygen_db_per_km, "oxygen_db_per_km"), (s.range_m, "range_m")):
+                       (s.range_m, "range_m")):
         assert mine.value == A.get(f"inputs.{name}.value"), name
+    # the oxygen attenuation is one entry read at each row's own centre frequency: 60 GHz for the radar, 60.48 GHz for the ay channel
+    o2 = "itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz="
+    assert A.get("inputs.oxygen_db_per_km.value") == S.num(o2 + f"{A.get('radar.center_ghz'):g}").value == 14.651
+    assert s.oxygen_db_per_km.value == S.num(o2 + f"{s.carrier_hz.value / 1e9:g}").value == 14.993 and s.oxygen_db_per_km.ref.endswith("=60.48")
     assert s.velocity_mps.value == A.get("target.velocity_mps")
     # the back-off is one rule, and it gives row A's own figure
     cap = table.row_a()["cap_dbm"]
@@ -200,8 +204,13 @@ def test_law4_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_
 
 
 # ----------------------------------------------------------------------------- law 7: wording
-def test_law7_no_802_11bf_entry_no_conformance_claim():
-    assert not [k for k in S.shared() if "80211bf" in k or k.startswith("bf.")], "spec_sources has an 802.11bf entry now: law 7's wording can be revisited"
+BF_KEYS = ("ieee80211bf.dmg_sensing_types", "ieee80211bf.dmg_sensing_scheduling", "ieee80211bf.dmg_monostatic_ppdu",
+           "ieee80211bf.dmg_sensing_bandwidth", "ieee80211bf.edmg_multistatic_ppdu")
+
+
+def test_law7_no_conformance_claim_anywhere():
+    """The entries exist since spec_sources#54; the wording did not change with them."""
+    assert all(k in S.shared() and S.shared()[k].source == "spec" for k in BF_KEYS)
     assert "no claim of 802.11bf conformance" in WORDING and WORDING in table.render()
     claim = re.compile(r"(符合|遵循|compliant with|conform\w* to|conformant)[^。.\n]{0,24}802\.11bf", re.I)
     files = [p for p in REPO.rglob("*") if p.is_file() and p.suffix in (".py", ".md", ".txt", ".yaml", ".yml", ".toml")
@@ -212,6 +221,27 @@ def test_law7_no_802_11bf_entry_no_conformance_claim():
             if claim.search(line) and not re.search(r"不说|不能说|no claim|not claim|does not claim|nothing here claims", line):
                 hits.append((str(p.relative_to(REPO)), i))
     assert not hits, hits
+
+
+def test_law7_what_is_said_is_checked_item_by_item_against_the_entries(t):
+    """Section 11: every item names its entry, and a 'fits' is computed from the entry, not written down."""
+    from jcas60 import bf
+    checks = t["bf"]
+    assert len(checks) == 10 and all(c["key"] in BF_KEYS for c in checks)
+    assert {c["verdict"] for c in checks} == {bf.FITS, bf.OPEN, bf.NO_ENTRY}
+    by = {(c["row"], c["item"]): c for c in checks}
+    assert by[("C", "the PPDU")]["verdict"] == bf.NO_ENTRY                       # the bistatic row's packet has no entry behind it
+    assert by[("B", "receiving while transmitting")]["verdict"] == bf.OPEN
+    s = t["setup"]
+    assert bf._field_max("intraburst_interval") == 255 and bf._field_max("interburst_interval") == 65535
+    assert s.interval_s.value * 1e6 <= 255 and 1e6 / s.frames_per_s.value <= 65535 and s.n_packets.value <= 255
+    text = table.render(t)
+    assert "== 11. the ay sensing frame against spec_sources' 802.11bf entries" in text and "this is not a statement of conformance" in text
+    # a frame that does not fit is reported as such: a packet every 300 us cannot be written in one octet of microseconds
+    import dataclasses
+    from jcas60.sources import Num
+    slow = dataclasses.replace(s, interval_s=Num(3e-4, "assumed", "test", "s"))
+    assert {c["item"]: c["verdict"] for c in bf.checks(slow)}["packets of one frame, start to start"] == "does not fit"
 
 
 # ----------------------------------------------------------------------------- the field itself
