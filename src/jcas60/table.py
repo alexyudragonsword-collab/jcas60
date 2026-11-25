@@ -170,11 +170,50 @@ def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num, snr
 
 
 # ----------------------------------------------------------------------------- the receiver's cost, both roads
-def monostatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
+def _crossing(x: np.ndarray, y: np.ndarray, level: float) -> float | None:
+    """Where the rising or falling curve ``y(x)`` first crosses ``level`` (linear between the points)."""
+    for k in range(len(x) - 1):
+        if (y[k] - level) * (y[k + 1] - level) <= 0.0 and y[k] != y[k + 1]:
+            return float(x[k] + (level - y[k]) * (x[k + 1] - x[k]) / (y[k + 1] - y[k]))
+    return None
+
+
+def compression_sweep(s: Setup, bench: _Bench, link: B.Link) -> dict:
+    """The receiver's compression against the level of the leakage, on both roads: the echo's SNR (closed form:
+    fmcw_radar's small-signal theory; simulation: noisy frames, against a linear receiver) and the image it throws
+    at the mirrored Doppler (closed form: an upper bound; simulation: one noise-free frame per level)."""
+    sim, env = bench.sim, bench.sim.unit_envelope()
+    p1 = s.fe.p1db_inband_dbm.value
+    span, step = float(s.sim["compression_span_db"]), float(s.sim["compression_step_db"])
+    levels = p1 + np.arange(-span, span + step / 2, step)
+    g, tgt, _ = bench.paths("monostatic", link, 0.0)
+    near = int(round(g.delay_s * sim.fs))
+    leak = lambda lvl: W.Path(float(lvl), s.leak_delay_s.value, 0.0, "leakage")      # noqa: E731
+    lin = bench.read([tgt, leak(levels[0])], bench.options("monostatic"), near)
+    rows = []
+    for lvl in levels:
+        c = B.compression(env, float(lvl), s)
+        nl = bench.read([tgt, leak(lvl)], bench.options("monostatic", rx_p1db_dbm=p1), near)
+        quiet = sim.read(sim.frame([tgt, leak(lvl)], bench.options("monostatic", rx_p1db_dbm=p1, noise=False), 0), near, (0,))
+        rows.append({"level_dbm": float(lvl), "snr_closed_db": c["snr"], "snr_sim_db": nl["snr_db"] - lin["snr_db"],
+                     "signal_closed_db": c["signal"], "signal_sim_db": nl["peak_dbm"] - lin["peak_dbm"],
+                     "image_closed_dbc": c["image"] - c["signal"], "image_sim_dbc": db(quiet["image_mw"] / quiet["peak_mw"]),
+                     "row_sidelobe_sim_dbc": db(quiet["row_sidelobe_mw"] / quiet["peak_mw"])})
+    x = np.array([r["level_dbm"] for r in rows])
+    loss = s.desense_allowed_db.value
+    return {"rows": rows, "env": env,
+            "level_snr_closed_dbm": B.strong_level_for_snr_loss(env, s, loss),
+            "level_snr_sim_dbm": _crossing(x, np.array([r["snr_sim_db"] for r in rows]), -loss),
+            "snr_limit_closed_db": B.compression(env, p1 + 60.0, s)["snr"],
+            "level_snr_closed_by_p": [(p, B.strong_level_for_snr_loss(env, s, loss, p)) for p in (1.0, 3.0)]}
+
+
+def monostatic_block(s: Setup, bench: _Bench, reading: R.Reading, sweep: dict) -> dict:
     eirp = reading.eirp_dbm
     link = B.link(s, "monostatic", eirp)
-    cost = B.monostatic_cost(s, eirp)
+    cost = B.monostatic_cost(s, eirp, sweep["env"])
     near = int(round(B.geometry(s, "monostatic").delay_s * bench.sim.fs))
+    p1 = s.fe.p1db_inband_dbm.value
     checks = []
     for label, iso, short, leak, enob_need in cost.have:
         _, tgt, st = bench.paths("monostatic", link, leak.value)
@@ -182,6 +221,9 @@ def monostatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
         adc = bench.read([tgt, st], bench.options("monostatic", adc_enob=s.adc_enob.value), near)
         pn = bench.read([tgt, st], bench.options("monostatic", lo="shared"), near)
         q = bench.sim.frame([tgt, st], bench.options("monostatic", adc_enob=s.adc_enob.value), 0).quant
+        comp = bench.read([tgt, st], bench.options("monostatic", rx_p1db_dbm=p1), near)
+        quiet = bench.sim.read(bench.sim.frame([tgt, st], bench.options("monostatic", rx_p1db_dbm=p1, noise=False), 0), near, (0,))
+        c = B.compression(sweep["env"], leak.value, s)
         checks.append({
             "noise_lsb": q["noise_lsb"], "repeating_share": q["repeating_share"],
             "adc_rise_varying_db": B.floor_rise_db(db(q["varying_mw"]) - db(s.adc_osr.value), link.noise_chip_dbm.value),
@@ -191,13 +233,27 @@ def monostatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
             "adc_rise_sim_db": adc["floor_dbm"] - lin["floor_dbm"], "adc_ridge_dbm": adc["ridge_dbm"], "adc_peak_change_db": adc["peak_dbm"] - lin["peak_dbm"],
             "pn_rise_closed_db": B.floor_rise_db(leak.value + cost.pn_residual_dbc.value, link.noise_chip_dbm.value),
             "pn_rise_sim_db": pn["floor_dbm"] - lin["floor_dbm"],
-            "ridge_linear_dbm": lin["ridge_dbm"], "peak_dbm": lin["peak_dbm"], "floor_dbm": lin["floor_dbm"]})
+            "ridge_linear_dbm": lin["ridge_dbm"], "peak_dbm": lin["peak_dbm"], "floor_dbm": lin["floor_dbm"],
+            "comp_snr_closed_db": c["snr"], "comp_snr_sim_db": comp["snr_db"] - lin["snr_db"],
+            "comp_signal_closed_db": c["signal"], "comp_signal_sim_db": comp["peak_dbm"] - lin["peak_dbm"],
+            "comp_image_closed_dbc": c["image"] - c["signal"], "comp_image_sim_dbc": db(quiet["image_mw"] / quiet["peak_mw"]),
+            "comp_row_sidelobe_sim_dbc": db(quiet["row_sidelobe_mw"] / quiet["peak_mw"]), "comp_ridge_dbm": comp["ridge_dbm"]})
     _, tgt, _ = bench.paths("monostatic", link, 0.0)
     alone = bench.read([tgt], bench.options("monostatic"), near, strong=())
+    above = cost.compression_level_dbm.value - p1                 # the criterion's level over the 1 dB point: the same at every gain setting
     gains = []
-    for gdb, nf, p1 in zip(S.raw("rx60.radar_iwr6843_fig7_2#gain_db"), S.raw("rx60.radar_iwr6843_fig7_2#nf_db"), S.raw("rx60.radar_iwr6843_fig7_2#p1db_inband_dbm")):
-        gains.append((float(gdb), float(nf), float(p1), cost.conducted_dbm.value - float(p1) + s.compression_margin_db.value))
-    return {"reading": reading.name, "cost": cost, "checks": checks, "snr_no_leak_db": alone["snr_db"], "gains": gains}
+    for gdb, nf, p1g in zip(S.raw("rx60.radar_iwr6843_fig7_2#gain_db"), S.raw("rx60.radar_iwr6843_fig7_2#nf_db"), S.raw("rx60.radar_iwr6843_fig7_2#p1db_inband_dbm")):
+        gains.append((float(gdb), float(nf), float(p1g), cost.conducted_dbm.value - (float(p1g) + above)))
+    cond = cost.conducted_dbm.value
+    # the limiter's image of this row's target at the level of the map's floor: where the two roads put the leakage
+    floor_dbc = -link.snr_grid_db.value
+    x = np.array([r["level_dbm"] for r in sweep["rows"]])
+    lvl_sim = _crossing(x, np.array([r["image_sim_dbc"] for r in sweep["rows"]]), floor_dbc)
+    ghost = {"floor_dbc": floor_dbc, "need_closed_db": cond - B.strong_level_for_image(sweep["env"], s, floor_dbc),
+             "need_sim_db": None if lvl_sim is None else cond - lvl_sim}
+    return {"reading": reading.name, "cost": cost, "checks": checks, "snr_no_leak_db": alone["snr_db"], "gains": gains,
+            "need_compression_sim_db": None if sweep["level_snr_sim_dbm"] is None else cond - sweep["level_snr_sim_dbm"],
+            "need_by_p": [(p, None if lvl is None else cond - lvl) for p, lvl in sweep["level_snr_closed_by_p"]], "ghost": ghost}
 
 
 def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
@@ -209,7 +265,8 @@ def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
     lin = bench.read([tgt, st], bench.options("bistatic"), near)
     pn = bench.read([tgt, st], bench.options("bistatic", lo="independent"), near)
     res = B.pn_residual_independent(s, s.field.n_correlated / s.chip_rate_hz.value)
-    return {"reading": reading.name, "direct_dbm": direct,
+    comp = B.compression(bench.sim.unit_envelope(), direct.value, s)
+    return {"reading": reading.name, "direct_dbm": direct, "comp_snr_closed_db": comp["snr"], "comp_image_closed_dbc": comp["image"] - comp["signal"],
             "enob_needed": derive(B.enob_required(direct.value, link.noise_chip_dbm.value, s), "ENOB for the quantisation noise to cost the allowed desensitisation",
                                   direct, link.noise_chip_dbm, s.adc_backoff_db, s.adc_osr, s.desense_allowed_db, unit="bit"),
             "under_p1db_db": derive(s.fe.p1db_inband_dbm.value - direct.value, "P1dB(in band) - direct path", s.fe.p1db_inband_dbm, direct, unit="dB"),
@@ -296,7 +353,8 @@ def build() -> dict:
     v_max = rows[1]["velocity_max_mps"].value
     return {
         "setup": s, "rows": rows, "readings": (comm, radar),
-        "monostatic": [monostatic_block(s, bench, r) for r in (comm, radar)],
+        "compression": (sweep := compression_sweep(s, bench, rows[1]["link"])),
+        "monostatic": [monostatic_block(s, bench, r, sweep) for r in (comm, radar)],
         "bistatic": [bistatic_block(s, bench, r) for r in (comm, radar)],
         "golay": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0)),
         "pulse_sidelobes": pulse_sidelobes(s, bench), "width_measured_chips": measured_width_chips(s, bench),
@@ -419,23 +477,37 @@ def render(t: dict | None = None) -> str:
     for blk in t["monostatic"]:
         c = blk["cost"]
         w(f"  B, {blk['reading']} (conducted {c.conducted_dbm.value:g} dBm): isolation needed for the leakage to cost at most {s.desense_allowed_db.value:g} dB of sensitivity")
-        w(f"      in-band compression  {c.need_compression_db.value:6.1f} dB {c.need_compression_db.label}  (leakage {s.compression_margin_db.value:g} dB under the in-band P1dB; {c.need_compression_at_p1db_db.value:.1f} dB to sit at P1dB itself)   closed form only")
+        gh = blk["ghost"]
+        w(f"      in-band compression  {c.need_compression_db.value:6.1f} dB {c.need_compression_db.label}  (closed form; simulated {blk['need_compression_sim_db']:.1f} dB: the leakage at {c.compression_level_dbm.value:.1f} dBm, "
+          f"{c.compression_level_dbm.value - fe.p1db_inband_dbm.value:+.1f} dB from the in-band P1dB; {c.need_compression_at_p1db_db.value:.1f} dB puts it at P1dB itself)")
         w(f"      ADC quantisation     {c.need_adc_db.value:6.1f} dB {c.need_adc_db.label}  (ENOB {s.adc_enob.value:.2f} at {s.adc_fs_hz.value / 1e9:g} GS/s, {s.adc_backoff_db.value:g} dB under full scale)")
         w(f"      LO phase noise       {c.need_pn_db.value:6.1f} dB {c.need_pn_db.label}  (shared LO, leakage delayed {s.leak_delay_s.value * 1e9:g} ns: residual {c.pn_residual_dbc.value:.1f} dBc after range correlation)")
         w(f"      -> {c.need_db.value:.1f} dB, set by the {c.binding}")
+        w(f"      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target ({gh['floor_dbc']:.1f} dBc) the isolation is "
+          f"{gh['need_closed_db']:.1f} dB by the closed form (an upper bound on the image) / {gh['need_sim_db']:.1f} dB simulated")
         for ck in blk["checks"]:
             w(f"      have {ck['isolation_db'].show('g')} dB, {ck['label']}: short by {ck['shortfall_db'].value:.1f} dB; leakage {ck['leak_dbm'].value:g} dBm; ENOB needed {ck['enob_needed'].value:.2f}")
             w(f"          both roads, floor rise: ADC closed {ck['adc_rise_closed_db']:.2f} dB / simulated {ck['adc_rise_sim_db']:.2f} dB; LO phase noise closed {ck['pn_rise_closed_db']:.2f} dB / simulated {ck['pn_rise_sim_db']:.2f} dB")
             w(f"          the ADC's error: thermal noise is {ck['noise_lsb']:.2f} LSB rms, {ck['repeating_share'] * 100:.0f} % of the error is the same in every packet (the closed form takes all of it for noise); "
               f"the part that is not gives a floor rise of {ck['adc_rise_varying_db']:.2f} dB, the rest is the zero-Doppler ridge")
+            w(f"          compression (limiter, p = {s.rx_rapp_p.value:g}): SNR closed {ck['comp_snr_closed_db']:+.2f} dB / simulated {ck['comp_snr_sim_db']:+.2f} dB (the echo itself {ck['comp_signal_closed_db']:+.2f} / {ck['comp_signal_sim_db']:+.2f} dB); "
+              f"image at the mirrored Doppler {ck['comp_image_sim_dbc']:.1f} dBc (closed-form bound {ck['comp_image_closed_dbc']:.1f} dBc); the target's range sidelobes {ck['comp_row_sidelobe_sim_dbc']:.1f} dBc; ridge {ck['comp_ridge_dbm']:.1f} dBm")
             w(f"          simulation, linear receiver and ideal ADC: SNR {ck['snr_linear_db']:.2f} dB with the leakage, {blk['snr_no_leak_db']:.2f} dB without; "
               f"with the ADC the zero-Doppler ridge at the target's range is {ck['adc_ridge_dbm']:.1f} dBm (target {ck['peak_dbm']:.1f} dBm, floor {ck['floor_dbm']:.1f} dBm) and the target's peak moves {ck['adc_peak_change_db']:+.2f} dB")
     g0 = t["monostatic"][0]
     w(f"  B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), {t['monostatic'][0]['reading']}: "
-      + "; ".join(f"{gd:g} dB gain: NF {nf:g} dB, P1dB {p1:g} dBm, needs {need:.0f} dB" for gd, nf, p1, need in g0["gains"]))
+      + "; ".join(f"{gd:g} dB gain: NF {nf:g} dB, P1dB {p1:g} dBm, needs {need:.1f} dB" for gd, nf, p1, need in g0["gains"]))
+    cs = t["compression"]
+    w(f"  B, the limiter against the leakage's level (in-band P1dB {fe.p1db_inband_dbm.value:g} dBm, p = {s.rx_rapp_p.show('g')}; the echo's SNR never loses more than {-cs['snr_limit_closed_db']:.2f} dB: the limiter takes the noise down with it):")
+    w(f"      {'leakage [dBm]':>14s} {'SNR closed':>12s} {'SNR simulated':>14s} {'echo closed':>12s} {'echo simulated':>15s} {'image bound [dBc]':>18s} {'image simulated':>16s} {'range sidelobes':>16s}")
+    for r in cs["rows"]:
+        w(f"      {r['level_dbm']:14.0f} {r['snr_closed_db']:12.2f} {r['snr_sim_db']:14.2f} {r['signal_closed_db']:12.2f} {r['signal_sim_db']:15.2f} {r['image_closed_dbc']:18.1f} {r['image_sim_dbc']:16.1f} {r['row_sidelobe_sim_dbc']:16.1f}")
+    w(f"      with another knee the {s.desense_allowed_db.value:g} dB criterion moves ({t['monostatic'][0]['reading']}): "
+      + "; ".join(f"p = {p:g}: {'never reached' if need is None else format(need, '.1f') + ' dB'}" for p, need in t["monostatic"][0]["need_by_p"]))
     for blk in t["bistatic"]:
         w(f"  C, {blk['reading']}: direct path {blk['direct_dbm'].value:.1f} dBm {blk['direct_dbm'].label}, {blk['under_p1db_db'].value:.1f} dB under the in-band P1dB; ENOB needed {blk['enob_needed'].value:.2f}; "
-          f"independent LOs after referencing to the direct path: residual {blk['pn_residual_dbc']:.1f} dBc, floor rise closed {blk['pn_rise_closed_db']:.2f} dB / simulated {blk['pn_rise_sim_db']:.2f} dB (SNR {blk['pn_snr_change_db']:+.2f} dB)")
+          f"independent LOs after referencing to the direct path: residual {blk['pn_residual_dbc']:.1f} dBc, floor rise closed {blk['pn_rise_closed_db']:.2f} dB / simulated {blk['pn_rise_sim_db']:.2f} dB (SNR {blk['pn_snr_change_db']:+.2f} dB); "
+          f"compression at that level (closed form): SNR {blk['comp_snr_closed_db']:+.3f} dB, image bound {blk['comp_image_closed_dbc']:.1f} dBc")
     w("     C pays elsewhere: the two devices share no clock, so every packet's phase is taken from the direct path (simulated) and its timing and carrier offset from the preamble (not simulated)")
     w("")
     w(f"== 6. air time: {s.frames_per_s.value:g} sensing frames a second, against a link at {a['rate_mbps'].show('g')} Mb/s (mmw60_trx's comparison table, ay_sc on channel 2) ==")

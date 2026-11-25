@@ -47,7 +47,7 @@ class Setup:
     adc_enob_per_octave: Num
     adc_enob_ref_hz: float
     adc_backoff_db: Num
-    compression_margin_db: Num
+    rx_rapp_p: Num
     leak_delay_s: Num
     # detection
     pd: Num
@@ -105,7 +105,7 @@ def setup() -> Setup:
     if str(S.raw("assumed.ay_sc_pulse#shape")) != "root-raised-cosine":
         raise ValueError("mmw60_trx's SC pulse is no longer a root-raised cosine: jcas60's pulse model does not fit it")
     sim = {k: S.raw(f"jcas60.sim#{k}") for k in ("seed", "frames_averaged", "buffer_chips", "exclude_doppler_bins",
-                                                "exclude_range_lags", "cfar_guard", "cfar_train")}
+                                                "exclude_range_lags", "cfar_guard", "cfar_train", "compression_span_db", "compression_step_db")}
     return Setup(
         fe=shared(),
         range_m=S.num("jcas60.target#range_m", "m"), velocity_mps=S.num("jcas60.target#velocity_mps", "m/s"),
@@ -118,7 +118,7 @@ def setup() -> Setup:
         adc_osr=S.num("jcas60.adc#samples_per_chip"), desense_allowed_db=S.num("jcas60.adc#desense_allowed_db", "dB"),
         adc_enob_ref=S.num("assumed.converter_enob_ref", "bit"), adc_enob_per_octave=S.num("assumed.converter_bits_per_octave"),
         adc_enob_ref_hz=1e9, adc_backoff_db=S.num("assumed.converter_backoff_db", "dB"),
-        compression_margin_db=S.num("jcas60.compression_margin_db", "dB"), leak_delay_s=S.num("jcas60.leakage_delay_s", "s"),
+        rx_rapp_p=S.num("jcas60.rx_rapp_p"), leak_delay_s=S.num("jcas60.leakage_delay_s", "s"),
         pd=S.num("jcas60.detection#pd"),
         bi_r_tx_m=S.num("jcas60.bistatic_geometry#r_tx_m", "m"), bi_r_rx_m=S.num("jcas60.bistatic_geometry#r_rx_m", "m"),
         bi_baseline_m=S.num("jcas60.bistatic_geometry#baseline_m", "m"),

@@ -87,7 +87,7 @@ def test_the_numbers_the_conclusions_quote(t):
            "need": t["monostatic"][0]["cost"].need_db.value, "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
            "need pn": t["monostatic"][0]["cost"].need_pn_db.value, "air": rows[1]["air_fraction"].value * 100, "air A": rows[0]["air_fraction"].value * 100}
     want = {"A snr": 43.34, "B comm snr": 30.74, "B radar snr": 28.74, "B comm range": 14.28, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
-            "B width cm": 7.43, "B clean": 10.90, "need": 56.0, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
+            "B width cm": 7.43, "B clean": 10.90, "need": 43.3, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
     for k, v in want.items():
         assert got[k] == pytest.approx(v, abs=0.006 if v < 20 or "snr" in k or "range" in k else 0.06), k
     assert regulatory.comm_rate_mbps().value == 4620.0

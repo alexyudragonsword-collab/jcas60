@@ -82,7 +82,9 @@ def record() -> dict:
     s = t["setup"]
     _flat("table.rows", [{k: v for k, v in r.items() if k not in ("link",)} for r in t["rows"]], out)
     _flat("table.links", [r["link"] for r in t["rows"][1:]], out)
-    _flat("table.monostatic", [{"cost": b["cost"], "checks": b["checks"], "gains": b["gains"], "snr_no_leak_db": b["snr_no_leak_db"]} for b in t["monostatic"]], out)
+    _flat("table.monostatic", [{k: v for k, v in b.items() if k != "reading"} for b in t["monostatic"]], out)
+    _flat("table.compression", {k: v for k, v in t["compression"].items() if k != "env"}, out)
+    _flat("sim.unit_envelope", t["compression"]["env"], out)
     _flat("table.bistatic", t["bistatic"], out)
     _flat("table.golay", t["golay"], out)
     _flat("table.pulse_sidelobes", t["pulse_sidelobes"], out)

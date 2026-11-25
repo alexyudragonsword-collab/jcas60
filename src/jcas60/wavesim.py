@@ -19,7 +19,9 @@ enter a correlation window, and the pulse's tails from there are below
    across packets -- and the Doppler's turn inside the packet, which is what
    spoils a Golay pair's complementarity;
 4. the receiver's LO (the same phase noise for a shared LO, another
-   realisation for an independent one), thermal noise, the ADC if on;
+   realisation for an independent one), thermal noise, the receiver's
+   compression if on (fmcw_radar's memoryless Rapp limiter on the complex
+   envelope, vendored), the ADC if on;
 5. matched filter, then for each lag the two 512-chip cyclic correlations
    summed and divided by 1024: a path of power P reads P at its lag.
 
@@ -39,6 +41,7 @@ import numpy as np
 from .budget import Geometry, rc_spectrum
 from .config import Setup
 from .physconst import C0, undb
+from .vendor.fmcw_radar.link.compression import rapp as _rapp
 from .vendor.fmcw_radar.processing import cfar as _cfar
 from .vendor.fmcw_radar.processing import rd as _rd
 
@@ -55,6 +58,7 @@ class Path:
 class Options:
     noise: bool = True
     adc_enob: float | None = None      # None: no quantiser
+    rx_p1db_dbm: float | None = None   # None: a linear receiver; else the input 1 dB point of a Rapp limiter ahead of the ADC
     lo: str | None = None              # None: no phase noise | "shared" | "independent"
     reference_lag: int | None = None   # bistatic: the lag (in samples) whose phase every packet is turned back by
     random_packet_phase: bool = False  # bistatic: an unknown carrier phase per packet (no common LO)
@@ -125,6 +129,12 @@ class Simulator:
             return np.clip((np.floor(v / step) + 0.5) * step, -full_scale + step / 2, full_scale - step / 2)
         return q(x.real) + 1j * q(x.imag)
 
+    def unit_envelope(self) -> np.ndarray:
+        """The transmitted field's envelope at unit mean power, one value per sample of the field: what a strong
+        static path (the leakage) looks like to the receiver's compression, up to its level."""
+        seg = slice(self.start * self.osr, (self.start + self.s.field.chips.size) * self.osr)
+        return np.abs(np.fft.ifft(self.tx_f)[seg]) / math.sqrt(self.tx_power)
+
     def correlate(self, y: np.ndarray) -> np.ndarray:
         """Matched filter, then the summed cyclic correlations at every lag."""
         z = np.fft.ifft(np.fft.fft(y) * self.rrc)
@@ -162,6 +172,8 @@ class Simulator:
                 y *= np.exp(-1j * phi_rx)
             if opt.noise:
                 y += sigma * (rng.standard_normal(self.n) + 1j * rng.standard_normal(self.n))
+            if opt.rx_p1db_dbm is not None:                                            # the receiver's compression, on signal and noise alike
+                y = _rapp(y, math.sqrt(undb(opt.rx_p1db_dbm)), s.rx_rapp_p.value)
             if opt.adc_enob is not None:
                 if full_scale is None:                                                  # the AGC sets the range once, on the first packet's field
                     full_scale = math.sqrt(float(np.mean(np.abs(y[seg]) ** 2))) * 10.0 ** (s.adc_backoff_db.value / 20.0)
@@ -219,8 +231,13 @@ class Simulator:
         r_idx, c_idx = np.flatnonzero(rows), np.flatnonzero(cols)
         sub = p[np.ix_(r_idx, c_idx)]
         floor = _rd.noise_floor(sub, (int(np.searchsorted(r_idx, i)), int(np.searchsorted(c_idx, j))), (ex_d, ex_r))
+        # the target's own Doppler row away from its peak (range sidelobes: what a gain that follows the strong path's
+        # envelope scatters the echo into) and the mirrored Doppler at the target's lag (a limiter's image)
+        far = cols & (np.abs(np.arange(p.shape[1]) - j) > ex_r)
+        mirror = (m - i) % m if m % 2 == 0 else m - 1 - i
         return {"peak_mw": float(p[i, j]), "floor_mw": floor, "snr_db": 10.0 * math.log10(p[i, j] / floor),
-                "doppler_index": int(i), "lag": int(j + self.lag_lo), "ridge_mw": float(p[m // 2, j])}
+                "doppler_index": int(i), "lag": int(j + self.lag_lo), "ridge_mw": float(p[m // 2, j]),
+                "row_sidelobe_mw": float(p[i, far].max()), "image_mw": float(p[mirror, j])}
 
     def cfar(self, fr: Frame, pfa: float) -> np.ndarray:
         """fmcw_radar's CA-CFAR on the map's chip-spaced lags (independent cells)."""

@@ -199,6 +199,15 @@ def test_law4_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_
                 assert ck["repeating_share"] > 0.5 and ck["adc_rise_sim_db"] < ck["adc_rise_closed_db"] - 1.0
             assert abs(ck["adc_rise_sim_db"] - ck["adc_rise_varying_db"]) < 0.2    # the part that is not the same in every packet is the floor
             assert abs(ck["snr_linear_db"] - blk["snr_no_leak_db"]) < 0.2          # a linear receiver does not lose sensitivity to the leakage
+            # the receiver's compression: the small-signal closed form and the limiter in the simulation
+            assert abs(ck["comp_snr_sim_db"] - ck["comp_snr_closed_db"]) < 0.4 and abs(ck["comp_signal_sim_db"] - ck["comp_signal_closed_db"]) < 0.5
+            assert ck["comp_image_sim_dbc"] < ck["comp_image_closed_dbc"]             # the closed form's image is an upper bound
+        assert abs(blk["need_compression_sim_db"] - blk["cost"].need_compression_db.value) < 0.3
+        assert blk["ghost"]["need_sim_db"] < blk["ghost"]["need_closed_db"] < blk["ghost"]["need_sim_db"] + 4.0
+    sweep = t["compression"]
+    for r in sweep["rows"]:
+        assert abs(r["snr_sim_db"] - r["snr_closed_db"]) < 0.25 and r["image_sim_dbc"] < r["image_closed_dbc"], r["level_dbm"]
+    assert 3.0 < -sweep["snr_limit_closed_db"] < 3.3                                   # a limiter never costs the echo much more than 3 dB of SNR
     for blk in t["bistatic"]:
         assert abs(blk["pn_rise_sim_db"] - blk["pn_rise_closed_db"]) < 1.0
 

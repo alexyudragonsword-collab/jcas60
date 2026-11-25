@@ -15,7 +15,7 @@ PINS = {"spec_sources": "0d17de6440344832737140ecfcdbf96b175a042a", "mmw60_trx":
 
 def test_every_vendored_file_names_its_upstream_at_a_full_sha():
     files = V.vendored_files()
-    assert len(files) == 16
+    assert len(files) == 17
     for f in files:
         m = V.HEADER.match(f.read_text(encoding="utf-8").splitlines()[0])
         assert m, f
@@ -56,5 +56,5 @@ def test_only_what_is_read_is_vendored():
     assert imports == ["from __future__ import annotations", "import numpy as np", "from .golay import golay_pair"]
     used = (REPO / "src/jcas60").glob("*.py")
     text = "\n".join(p.read_text(encoding="utf-8") for p in used)
-    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "ay import preamble"):
+    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble"):
         assert mod in text, mod

@@ -1,4 +1,4 @@
-engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; no PA / LNA nonlinearity) -- compression conclusions are closed-form only
+engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; the receiver's compression is a memoryless limiter, the transmitter is linear) -- no AM/PM, no memory, no spur conclusions
 jcas60 0.1.0; milestone 0: sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11 holds what was checked against spec_sources' 802.11bf entries, item by item)
 one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, at the cell SNR fmcw_radar's report says its map's CA-CFAR needs, 12.24 [derived/assumed] dB, for every row (with the noise level known: 11.75 dB)
 tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from spec numbers, [derived/assumed] computed from at least one assumed number
@@ -64,34 +64,56 @@ B  ay SC Golay field, monostatic   3520 [derived/assumed] MS/s    2 (I and Q)   
 C  ay SC Golay field, bistatic     3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
   A: its leakage budget is not in its default report (the model is off in that config; its example 08 turns it on); an FMCW radar's leakage beats to near zero frequency and is filtered ahead of the ADC
   B, communication limit (conducted 12 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
-      in-band compression    56.0 dB [derived/assumed]  (leakage 10 dB under the in-band P1dB; 46.0 dB to sit at P1dB itself)   closed form only
+      in-band compression    43.3 dB [derived/assumed]  (closed form; simulated 43.3 dB: the leakage at -31.3 dBm, +2.7 dB from the in-band P1dB; 46.0 dB puts it at P1dB itself)
       ADC quantisation       39.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
       LO phase noise         43.0 dB [derived/assumed]  (shared LO, leakage delayed 0.1 ns: residual -44.4 dBc after range correlation)
-      -> 56.0 dB, set by the in-band compression
-      have 20 [derived] dB, antenna arrays without EBG (low end): short by 36.0 dB; leakage -8 dBm; ENOB needed 12.39
+      -> 43.3 dB, set by the in-band compression
+      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target (-29.9 dBc) the isolation is 50.9 dB by the closed form (an upper bound on the image) / 48.8 dB simulated
+      have 20 [derived] dB, antenna arrays without EBG (low end): short by 23.3 dB; leakage -8 dBm; ENOB needed 12.39
           both roads, floor rise: ADC closed 14.18 dB / simulated 9.24 dB; LO phase noise closed 17.20 dB / simulated 17.29 dB
           the ADC's error: thermal noise is 0.06 LSB rms, 69 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 9.25 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -3.19 dB / simulated -3.48 dB (the echo itself -30.42 / -30.59 dB); image at the mirrored Doppler -10.2 dBc (closed-form bound -0.0 dBc); the target's range sidelobes -26.5 dBc; ridge -104.3 dBm
           simulation, linear receiver and ideal ADC: SNR 29.82 dB with the leakage, 29.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.1 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -1.00 dB
-      have 40 [spec] dB, antenna arrays with EBG: short by 16.0 dB; leakage -28 dBm; ENOB needed 9.07
+      have 40 [spec] dB, antenna arrays with EBG: short by 3.3 dB; leakage -28 dBm; ENOB needed 9.07
           both roads, floor rise: ADC closed 0.97 dB / simulated 0.98 dB; LO phase noise closed 1.80 dB / simulated 1.85 dB
           the ADC's error: thermal noise is 0.58 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.96 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -2.11 dB / simulated -2.16 dB (the echo itself -9.59 / -9.94 dB); image at the mirrored Doppler -11.4 dBc (closed-form bound -2.6 dBc); the target's range sidelobes -33.0 dBc; ridge -103.7 dBm
           simulation, linear receiver and ideal ADC: SNR 29.82 dB with the leakage, 29.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -114.6 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -0.06 dB
   B, radar limit (conducted 10 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
-      in-band compression    54.0 dB [derived/assumed]  (leakage 10 dB under the in-band P1dB; 44.0 dB to sit at P1dB itself)   closed form only
+      in-band compression    41.3 dB [derived/assumed]  (closed form; simulated 41.3 dB: the leakage at -31.3 dBm, +2.7 dB from the in-band P1dB; 44.0 dB puts it at P1dB itself)
       ADC quantisation       37.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
       LO phase noise         41.0 dB [derived/assumed]  (shared LO, leakage delayed 0.1 ns: residual -44.4 dBc after range correlation)
-      -> 54.0 dB, set by the in-band compression
-      have 20 [derived] dB, antenna arrays without EBG (low end): short by 34.0 dB; leakage -10 dBm; ENOB needed 12.06
+      -> 41.3 dB, set by the in-band compression
+      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target (-27.9 dBc) the isolation is 48.4 dB by the closed form (an upper bound on the image) / 46.3 dB simulated
+      have 20 [derived] dB, antenna arrays without EBG (low end): short by 21.3 dB; leakage -10 dBm; ENOB needed 12.06
           both roads, floor rise: ADC closed 12.27 dB / simulated 8.39 dB; LO phase noise closed 15.25 dB / simulated 15.34 dB
           the ADC's error: thermal noise is 0.07 LSB rms, 61 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 8.40 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -3.19 dB / simulated -3.31 dB (the echo itself -28.42 / -28.57 dB); image at the mirrored Doppler -10.2 dBc (closed-form bound -0.0 dBc); the target's range sidelobes -27.7 dBc; ridge -104.3 dBm
           simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.77 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.9 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.65 dB
-      have 40 [spec] dB, antenna arrays with EBG: short by 14.0 dB; leakage -30 dBm; ENOB needed 8.74
+      have 40 [spec] dB, antenna arrays with EBG: short by 1.3 dB; leakage -30 dBm; ENOB needed 8.74
           both roads, floor rise: ADC closed 0.64 dB / simulated 0.67 dB; LO phase noise closed 1.22 dB / simulated 1.26 dB
           the ADC's error: thermal noise is 0.72 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.63 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -1.45 dB / simulated -1.45 dB (the echo itself -7.09 / -7.37 dB); image at the mirrored Doppler -13.0 dBc (closed-form bound -4.9 dBc); the target's range sidelobes -32.5 dBc; ridge -103.8 dBm
           simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.77 dB without; with the ADC the zero-Doppler ridge at the target's range is -115.0 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.04 dB
-  B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), communication limit: 30 dB gain: NF 15.6 dB, P1dB -24 dBm, needs 46 dB; 36 dB gain: NF 12.2 dB, P1dB -30 dBm, needs 52 dB; 40 dB gain: NF 11 dB, P1dB -34 dBm, needs 56 dB; 44 dB gain: NF 10.5 dB, P1dB -38 dBm, needs 60 dB; 48 dB gain: NF 10.3 dB, P1dB -42 dBm, needs 64 dB
-  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -1.06 dB)
-  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.83 dB)
+  B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), communication limit: 30 dB gain: NF 15.6 dB, P1dB -24 dBm, needs 33.3 dB; 36 dB gain: NF 12.2 dB, P1dB -30 dBm, needs 39.3 dB; 40 dB gain: NF 11 dB, P1dB -34 dBm, needs 43.3 dB; 44 dB gain: NF 10.5 dB, P1dB -38 dBm, needs 47.3 dB; 48 dB gain: NF 10.3 dB, P1dB -42 dBm, needs 51.3 dB
+  B, the limiter against the leakage's level (in-band P1dB -34 dBm, p = 2 [assumed]; the echo's SNR never loses more than 3.19 dB: the limiter takes the noise down with it):
+       leakage [dBm]   SNR closed  SNR simulated  echo closed  echo simulated  image bound [dBc]  image simulated  range sidelobes
+                 -46        -0.00          -0.00        -0.02           -0.02              -57.9            -66.5            -53.7
+                 -44        -0.00          -0.00        -0.04           -0.04              -49.9            -57.9            -53.0
+                 -42        -0.00          -0.00        -0.10           -0.10              -42.0            -49.6            -51.4
+                 -40        -0.00          -0.00        -0.25           -0.25              -34.1            -41.7            -48.6
+                 -38        -0.02          -0.02        -0.61           -0.59              -26.6            -34.0            -44.4
+                 -36        -0.08          -0.07        -1.35           -1.34              -19.5            -26.9            -39.7
+                 -34        -0.31          -0.27        -2.70           -2.73              -13.4            -20.7            -35.7
+                 -32        -0.79          -0.75        -4.69           -4.85               -8.5            -16.0            -33.2
+                 -30        -1.45          -1.47        -7.09           -7.39               -4.9            -13.0            -32.5
+                 -28        -2.11          -2.16        -9.59           -9.94               -2.6            -11.4            -33.0
+                 -26        -2.62          -2.62       -11.99          -12.29               -1.2            -10.7            -33.7
+                 -24        -2.93          -2.86       -14.22          -14.46               -0.5            -10.4            -34.2
+                 -22        -3.08          -2.98       -16.34          -16.53               -0.2            -10.3            -34.5
+      with another knee the 1 dB criterion moves (communication limit): p = 1: 37.1 dB; p = 3: 45.1 dB
+  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -1.06 dB); compression at that level (closed form): SNR -0.000 dB, image bound -74.4 dBc
+  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.83 dB); compression at that level (closed form): SNR -0.000 dB, image bound -82.4 dBc
      C pays elsewhere: the two devices share no clock, so every packet's phase is taken from the direct path (simulated) and its timing and carrier offset from the preamble (not simulated)
 
 == 6. air time: 30 sensing frames a second, against a link at 4620 [derived/assumed] Mb/s (mmw60_trx's comparison table, ay_sc on channel 2) ==
@@ -130,7 +152,7 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.packet_overhead           {'sifs_per_packet': 1}  [assumed]
   jcas60.doppler_window            hann  [assumed]
   jcas60.adc                       {'samples_per_chip': 2, 'desense_allowed_db': 1.0}  [assumed]
-  jcas60.compression_margin_db     10.0  [assumed]
+  jcas60.rx_rapp_p                 2.0  [assumed]
   jcas60.leakage_delay_s           1e-10  [assumed]
   jcas60.lo_phase_noise            tgad_em.pn_params 的单极点单零点模型，每台设备一个本振  [assumed]
   jcas60.target                    {'range_m': 5.0, 'velocity_mps': 2.0}  [assumed]
@@ -139,7 +161,7 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.fmcw_airtime              FMCW 一帧的 chirp 串期间，这套前端不能通信  [assumed]
   jcas60.radar_reading_airtime     {'lower': '关断时间只管感知的发射：与按通信限值读时同一个占比', 'upper': '关断时间管这台设备的全部发射：任意 33 ms 里至少关断规定的时长'}  [assumed]
   jcas60.comm_limit_kind           average  [assumed]
-  jcas60.sim                       {'seed': 1, 'frames_averaged': 8, 'buffer_chips': 2048, 'exclude_doppler_bins': 4, 'exclude_range_lags': 8, 'cfar_guard': 2, 'cfar_train': 8}  [assumed]
+  jcas60.sim                       {'seed': 1, 'frames_averaged': 8, 'buffer_chips': 2048, 'exclude_doppler_bins': 4, 'exclude_range_lags': 8, 'cfar_guard': 2, 'cfar_train': 8, 'compression_span_db': 12, 'compression_step_db': 2}  [assumed]
 
 == 10. every reference read to build this table ==
   assumed.ay_sc_pulse#rolloff                                                      0.25 [assumed]
@@ -231,12 +253,12 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.channel#number                                                               2 [assumed]
   jcas60.channel#width_hz                                                      2.16e+09 [assumed]
   jcas60.comm_limit_kind                                                                [assumed]
-  jcas60.compression_margin_db                                                       10 [assumed]
   jcas60.detection#pd                                                               0.9 [assumed]
   jcas60.doppler_window                                                                 [assumed]
   jcas60.leakage_delay_s                                                          1e-10 [assumed]
   jcas60.packet_overhead#sifs_per_packet                                              1 [assumed]
   jcas60.rx_gain_db                                                                  40 [assumed]
+  jcas60.rx_rapp_p                                                                    2 [assumed]
   jcas60.sensing_burst#frames_per_s                                                  30 [assumed]
   jcas60.sensing_burst#interval_s                                                0.0001 [assumed]
   jcas60.sensing_burst#n_packets                                                     64 [assumed]
@@ -245,6 +267,8 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.sim#buffer_chips                                                               [assumed]
   jcas60.sim#cfar_guard                                                                 [assumed]
   jcas60.sim#cfar_train                                                                 [assumed]
+  jcas60.sim#compression_span_db                                                        [assumed]
+  jcas60.sim#compression_step_db                                                        [assumed]
   jcas60.sim#exclude_doppler_bins                                                       [assumed]
   jcas60.sim#exclude_range_lags                                                         [assumed]
   jcas60.sim#frames_averaged                                                            [assumed]
