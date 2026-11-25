@@ -8,7 +8,7 @@ and what they import, are copied; code outside this tree imports them through
 
 Pins
 ----
-* ``spec_sources/`` -- spec_sources @ ``f9ce3f2b035d4d83269aa4a4eb33982c53838286``:
+* ``spec_sources/`` -- spec_sources @ ``0d17de6440344832737140ecfcdbf96b175a042a``:
   the reader and five tables (``ieee80211`` -- the Golay sequences, the CEF
   layout, the EDMG SC numbers and PPDU lengths, the DMG timing; ``regulatory``
   -- 47 CFR 15.255, the communication limits and the radar tiers;

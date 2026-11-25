@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alexyudragonsword-collab/spec_sources
-          ref: f9ce3f2b035d4d83269aa4a4eb33982c53838286
+          ref: 0d17de6440344832737140ecfcdbf96b175a042a
           path: _siblings/spec_sources
       - name: Checkout mmw60_trx (pinned)
         uses: actions/checkout@v4
