@@ -6,20 +6,22 @@
 
 ```
 pip install -e ".[test]"
-python examples/00_comparison_table.py     # 里程碑 0 的对照表，约 30 s
+python examples/00_comparison_table.py     # 对照表，约 70 s
 pytest && ruff check src tests tools examples
 ```
 
-里程碑 0 的结论（5 m 处的人体；前提与每个数的出处见 `cairn/comparison-table.md` 与示例输出）：
+结论（5 m 处的人体；前提与每个数的出处见 `cairn/comparison-table.md` 与示例输出）：
 
-| | FMCW（fmcw_radar 默认） | ay 单站，通信限值 | ay 单站，雷达限值 |
+| | FMCW（fmcw_radar 默认） | ay，只用 L-CEF | ay，用 TRN 场 |
 |---|---:|---:|---:|
 | 距离分辨率 c/2B | 3.75 cm | 8.52 cm | 8.52 cm |
-| EIRP（各按各的上限） | 14 dBm | 22 dBm（单天线到不了 40 dBm） | 20 dBm |
-| SNR | 43.3 dB | 30.7 dB | 28.7 dB |
-| 占用的空口时间（30 帧/s） | 19.2 % | 1.16 % | 1.16 % … 50 % |
+| EIRP（各按各的上限；ay 按通信限值） | 14 dBm | 22 dBm（单天线到不了 40 dBm） | 22 dBm |
+| SNR | 43.3 dB | 30.7 dB | 43.8 dB |
+| 占用的空口时间（30 帧/s） | 19.2 % | 1.16 % | 4.51 % |
 | 接收 ADC | 10 MS/s × 12 bit | 3.52 GS/s × 2 路 | 同左 |
-| 单站需要的收发隔离 | —（泄漏在高通之外） | 56 dB，查到 40 / 20 dB | 54 dB |
+| 单站需要的收发隔离（灵敏度压低 1 dB） | —（泄漏在高通之外） | 43.3 dB，查到 40 / 20 dB | 同左 |
+
+按雷达限值读，ay 的 EIRP 是 20 dBm，SNR 各低 2 dB，空口时间的上界是 50 %；通信设备顺带感知适用哪一款，法规原文没有定论，对照表两种读法都出。
 
 - 它是 [mmw60_trx](https://github.com/alexyudragonsword-collab/mmw60_trx)（通信链路）与 [fmcw_radar](https://github.com/alexyudragonsword-collab/fmcw_radar)（FMCW 雷达）的姊妹库；外部的数只从 [spec_sources](https://github.com/alexyudragonsword-collab/spec_sources) 进来，三者按完整 SHA vendor 在 `src/jcas60/vendor/`。
 - 规则在 `AGENTS.md`，没做的在 `ROADMAP.md`，每轮的数字在 `cairn/LOG.md`。

@@ -18,50 +18,65 @@ tags: [spec] the source's own text, [survey] not verified, [assumed] this librar
 == 1. resolution and ambiguity ==
 row                                             bandwidth                   c/2B                   -3 dB width as processed              clean range            velocity res.              unambiguous v
 A  FMCW (fmcw_radar default)           4.00 [assumed] GHz 3.75 [derived/assumed] cm            5.34 [derived/assumed] cm, hann 14.99 [derived/assumed] m 0.390 [derived/assumed] m/s +-12.49 [derived/assumed] m/s
-B  ay SC Golay field, monostatic          1.76 [spec] GHz      8.52 [derived] cm 7.43 [derived/assumed] cm, none (the pulse)        10.90 [derived] m 0.387 [derived/assumed] m/s +-12.39 [derived/assumed] m/s
-C  ay SC Golay field, bistatic            1.76 [spec] GHz 9.83 [derived/assumed] cm 8.58 [derived/assumed] cm, none (the pulse) 13.40 [derived/assumed] m 0.447 [derived/assumed] m/s +-14.31 [derived/assumed] m/s
+B  ay L-CEF, monostatic                   1.76 [spec] GHz      8.52 [derived] cm 7.43 [derived/assumed] cm, none (the pulse)        10.90 [derived] m 0.387 [derived/assumed] m/s +-12.39 [derived/assumed] m/s
+C  ay L-CEF, bistatic                     1.76 [spec] GHz 9.83 [derived/assumed] cm 8.58 [derived/assumed] cm, none (the pulse) 13.40 [derived/assumed] m 0.447 [derived/assumed] m/s +-14.31 [derived/assumed] m/s
   clean range: A by the IF band; the ay rows by the 128-chip cyclic prefix (beyond it a window no longer holds a cyclic shift of its sequence; the sequences themselves repeat after 512 chips = 43.6 m)
   ay -3 dB width: closed form 0.8726 chips, waveform simulation 0.8725 chips (7.43 cm monostatic); roll-off 0.25 [assumed] (assumed.ay_sc_pulse, mmw60_trx)
   range sidelobes: A -32.2 dB (hann window); ay, between the chips, the pulse's own: -14.6 dB at 1.5 chips, -21.2 dB at 2.5 chips, -27.8 dB at 3.5 chips (waveform simulation; no range window is applied)
+  the TRN rows (B and C sensed on an EDMG TRN-R field of 4 [assumed] units = 30720 chips behind the same packet) have these same figures: the field changes the gain, not the pulse or the burst; their clean range is by the 128-chip guard block either side of the correlated blocks (10.90 m)
   bistatic (C): legs 5 m and 5 m, baseline 5 m, bistatic angle 60 deg; resolutions are along the bisector (jcas60.bistatic_geometry)
 
 == 2. link: EIRP, processing gain, SNR of the person at 5 m, range at Pd 0.9 ==
 row                                               limit             EIRP [dBm]                          processing gain          window loss           SNR(cell) [dB]       Pd          range at Pd 0.9 (SNR)   within the clean range
 A  FMCW (fmcw_radar default)                radar limit 14.00 [derived/assumed] 48.06 [derived/assumed] dB = 1000 samples x 64 chirps 3.52 [derived/assumed] dB  43.34 [derived/assumed]   1.0000      28.78 [derived/assumed] m              no: 14.99 m
-B  ay SC Golay field, monostatic    communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 10.90 m
-B  ay SC Golay field, monostatic            radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m              no: 10.90 m
-C  ay SC Golay field, bistatic      communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 13.40 m
-C  ay SC Golay field, bistatic              radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m                      yes
+B  ay L-CEF, monostatic             communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 10.90 m
+B  ay L-CEF, monostatic                     radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m              no: 10.90 m
+C  ay L-CEF, bistatic               communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 13.40 m
+C  ay L-CEF, bistatic                       radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m                      yes
+B  ay TRN field, monostatic         communication limit 22.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  43.75 [derived/assumed]   1.0000      29.41 [derived/assumed] m              no: 10.90 m
+B  ay TRN field, monostatic                 radar limit 20.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  41.75 [derived/assumed]   1.0000      26.35 [derived/assumed] m              no: 10.90 m
+C  ay TRN field, bistatic           communication limit 22.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  43.75 [derived/assumed]   1.0000      29.41 [derived/assumed] m              no: 13.40 m
+C  ay TRN field, bistatic                   radar limit 20.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  41.75 [derived/assumed]   1.0000      26.35 [derived/assumed] m              no: 13.40 m
   SNR(cell): thermal noise only, at the peak (no straddle).  Row A's range is its report's detection.range_at_pd: 28.78 m by SNR, 14.99 m as the report concludes (limited by: if_band)
   the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are 2.8 % longer (row B; 14.67 m)
   row A over row B, communication limit: +12.60 dB with 8 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x18.2 the chips, 0.68 ms a frame (2.0 % of the time, training alone)
   row A over row B, radar limit: +14.60 dB with 6 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x28.8 the chips, 1.07 ms a frame (3.2 % of the time, training alone)
+  row B on the TRN field against row A, communication limit: +0.41 dB with 8 dB more EIRP: 20480 chips a packet, 0.745 ms of correlated chips a frame
+  row B on the TRN field against row A, radar limit: -1.59 dB with 6 dB more EIRP: 20480 chips a packet, 0.745 ms of correlated chips a frame
   the ay budget, monostatic at 22 dBm: spreading 107.03 dB, oxygen 0.15 dB, echo -85.18 dBm, noise in 1.76 GHz -69.52 dBm, SNR per chip -15.66 dB
 
 == 3. the two roads (law 4): closed form against waveform simulation ==
 row                                               limit    closed, on the grid             simulation   difference   straddle                    read at   CA-CFAR  static path in the simulation
 A  FMCW (fmcw_radar default)                radar limit                      —                      —      +0.03 dB                                                  fmcw_radar's own two engines (time - statistical), from its example 00 as printed
-B  ay SC Golay field, monostatic    communication limit               29.87 dB               29.82 dB      -0.05 dB    0.87 dB         5.006 m, +1.99 m/s  detected  leakage at -28.0 dBm
-B  ay SC Golay field, monostatic            radar limit               27.87 dB               27.81 dB      -0.06 dB    0.87 dB         5.006 m, +1.98 m/s  detected  leakage at -30.0 dBm
-C  ay SC Golay field, bistatic      communication limit               29.37 dB               29.23 dB      -0.14 dB    1.37 dB         5.004 m, +2.00 m/s  detected  direct path at -50.1 dBm
-C  ay SC Golay field, bistatic              radar limit               27.37 dB               27.27 dB      -0.10 dB    1.37 dB         5.004 m, +2.01 m/s  detected  direct path at -52.1 dBm
+B  ay L-CEF, monostatic             communication limit               29.87 dB               29.82 dB      -0.05 dB    0.87 dB         5.006 m, +1.99 m/s  detected  leakage at -28.0 dBm
+B  ay L-CEF, monostatic                     radar limit               27.87 dB               27.81 dB      -0.06 dB    0.87 dB         5.006 m, +1.98 m/s  detected  leakage at -30.0 dBm
+C  ay L-CEF, bistatic               communication limit               29.37 dB               29.49 dB      +0.12 dB    1.37 dB         5.003 m, +2.00 m/s  detected  direct path at -50.1 dBm
+C  ay L-CEF, bistatic                       radar limit               27.37 dB               27.52 dB      +0.15 dB    1.37 dB         5.002 m, +2.01 m/s  detected  direct path at -52.1 dBm
+B  ay TRN field, monostatic         communication limit               42.88 dB               42.86 dB      -0.02 dB    0.87 dB         5.006 m, +2.00 m/s  detected  leakage at -28.0 dBm
+B  ay TRN field, monostatic                 radar limit               40.88 dB               40.85 dB      -0.03 dB    0.87 dB         5.006 m, +2.00 m/s  detected  leakage at -30.0 dBm
+C  ay TRN field, bistatic           communication limit               42.38 dB               42.33 dB      -0.05 dB    1.37 dB         5.005 m, +2.00 m/s  detected  direct path at -50.1 dBm
+C  ay TRN field, bistatic                   radar limit               40.38 dB               40.33 dB      -0.05 dB    1.37 dB         5.005 m, +2.00 m/s  detected  direct path at -52.1 dBm
   simulation: mean of 8 frames; the floor is read off the zero-Doppler ridge of the static path; the ADC and the LO phase noise are off here (section 5 turns them on)
 
 == 4. the limit each row is held to (law 3: each at its own; the ay rows under both readings of the rule) ==
 row                                               limit                     rule           EIRP limit [dBm]          back-off [dB]              off-time required  off-time the frame leaves  tier
 A  FMCW (fmcw_radar default)                radar limit      47 CFR 15.255(c)(2)             14 [spec] peak            8 [assumed]    25.5 ms in any 33 ms [spec]                   26.60 ms  57.0-64.0 GHz, with off-time
-B  ay SC Golay field, monostatic    communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
-B  ay SC Golay field, monostatic            radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.70 ms  57.0-61.56 GHz, with off-time
-C  ay SC Golay field, bistatic      communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
-C  ay SC Golay field, bistatic              radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.70 ms  57.0-61.56 GHz, with off-time
+B  ay L-CEF, monostatic             communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
+B  ay L-CEF, monostatic                     radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.70 ms  57.0-61.56 GHz, with off-time
+C  ay L-CEF, bistatic               communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
+C  ay L-CEF, bistatic                       radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.70 ms  57.0-61.56 GHz, with off-time
+B  ay TRN field, monostatic         communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
+B  ay TRN field, monostatic                 radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.68 ms  57.0-61.56 GHz, with off-time
+C  ay TRN field, bistatic           communication limit   47 CFR 15.255(c)(1)(i)          40 [spec] average    0 [derived/assumed]               none in the rule                          —  devices other than field disturbance sensors
+C  ay TRN field, bistatic                   radar limit      47 CFR 15.255(c)(2)             20 [spec] peak    2 [derived/assumed]    16.5 ms in any 33 ms [spec]                   26.68 ms  57.0-61.56 GHz, with off-time
   the front end's full power is 22 [derived/assumed] dBm EIRP: one antenna does not reach the communication limit; the two readings differ by 2 dB of EIRP and by the off-time
   radar reading of the ay rows: fmcw_radar's own check (vendored) on the 2.16 GHz channel 59.4-61.56 GHz, a burst of 64 packets of 3.055 us every 100 us, 30 frames a second
 
 == 5. what the receiver pays ==
 row                                                  ADC rate       channels                       bits   what the bits are
 A  FMCW (fmcw_radar default)                10 [assumed] MS/s    1 (real IF)            12.00 [assumed]   as configured
-B  ay SC Golay field, monostatic   3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
-C  ay SC Golay field, bistatic     3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
+B  ay L-CEF, monostatic            3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
+C  ay L-CEF, bistatic              3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
   A: its leakage budget is not in its default report (the model is off in that config; its example 08 turns it on); an FMCW radar's leakage beats to near zero frequency and is filtered ahead of the ADC
   B, communication limit (conducted 12 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
       in-band compression    43.3 dB [derived/assumed]  (closed form; simulated 43.3 dB: the leakage at -31.3 dBm, +2.7 dB from the in-band P1dB; 46.0 dB puts it at P1dB itself)
@@ -112,19 +127,24 @@ C  ay SC Golay field, bistatic     3520 [derived/assumed] MS/s    2 (I and Q)   
                  -24        -2.93          -2.86       -14.22          -14.46               -0.5            -10.4            -34.2
                  -22        -3.08          -2.98       -16.34          -16.53               -0.2            -10.3            -34.5
       with another knee the 1 dB criterion moves (communication limit): p = 1: 37.1 dB; p = 3: 45.1 dB
-  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -1.06 dB); compression at that level (closed form): SNR -0.000 dB, image bound -74.4 dBc
-  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.83 dB); compression at that level (closed form): SNR -0.000 dB, image bound -82.4 dBc
+  the TRN rows pay the same three: the leakage (or the direct path) is at the same level whatever field is sensed on; the receiver is on for 17.5 us of TRN field a packet instead of 0.73 us of L-CEF
+  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -0.98 dB); compression at that level (closed form): SNR -0.000 dB, image bound -74.4 dBc
+  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.71 dB); compression at that level (closed form): SNR -0.000 dB, image bound -82.4 dBc
      C pays elsewhere: the two devices share no clock, so every packet's phase is taken from the direct path (simulated) and its timing and carrier offset from the preamble (not simulated)
 
 == 6. air time: 30 sensing frames a second, against a link at 4620 [derived/assumed] Mb/s (mmw60_trx's comparison table, ay_sc on channel 2) ==
 row                                               limit                        share of the time               throughput given up [Mb/s]
 A  FMCW (fmcw_radar default)                radar limit                19.20 % [derived/assumed]                    887 [derived/assumed]
-B  ay SC Golay field, monostatic    communication limit                 1.16 % [derived/assumed]                     54 [derived/assumed]
-B  ay SC Golay field, monostatic            radar limit        1.16 % ... 50 % [derived/assumed]            54 ... 2310 [derived/assumed]
-C  ay SC Golay field, bistatic      communication limit                 1.16 % [derived/assumed]                     54 [derived/assumed]
-C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [derived/assumed]            54 ... 2310 [derived/assumed]
+B  ay L-CEF, monostatic             communication limit                 1.16 % [derived/assumed]                     54 [derived/assumed]
+B  ay L-CEF, monostatic                     radar limit        1.16 % ... 50 % [derived/assumed]            54 ... 2310 [derived/assumed]
+C  ay L-CEF, bistatic               communication limit                 1.16 % [derived/assumed]                     54 [derived/assumed]
+C  ay L-CEF, bistatic                       radar limit        1.16 % ... 50 % [derived/assumed]            54 ... 2310 [derived/assumed]
+B  ay TRN field, monostatic         communication limit                 4.51 % [derived/assumed]                    209 [derived/assumed]
+B  ay TRN field, monostatic                 radar limit        4.51 % ... 50 % [derived/assumed]           209 ... 2310 [derived/assumed]
+C  ay TRN field, bistatic           communication limit                 4.51 % [derived/assumed]                    209 [derived/assumed]
+C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [derived/assumed]           209 ... 2310 [derived/assumed]
   A: the frame's 6.4 ms of chirps, during which this front end cannot communicate (jcas60.fmcw_airtime)
-  ay: 64 packets of 5376 chips (3.055 us) plus one SIFS (3 us) each; under the radar reading the upper figure is the off-time taken to bind every emission of the device (jcas60.radar_reading_airtime); C's figure is the transmitting device's
+  ay: 64 packets of 5376 chips (3.055 us; with the TRN field 36096 chips, 20.509 us) plus one SIFS (3 us) each; under the radar reading the upper figure is the off-time taken to bind every emission of the device (jcas60.radar_reading_airtime); C's figure is the transmitting device's
 
 == 7. a Golay pair's sidelobes when the target moves (waveform simulation: one packet, no noise, target on a chip) ==
    radial velocity [m/s]     peak sidelobe in the zero zone [dBc]    peak [dB]     carrier turn over one sequence [rad]
@@ -134,6 +154,14 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
                     50.0                                    -60.0      -0.0009                                 3.69e-02
                    200.0                                    -47.9      -0.0304                                 1.47e-01
   0 m/s is the pair's exact cancellation at double precision; 12.4 m/s is the unambiguous velocity of section 1
+  the TRN field, blocks 2-5 of every subfield correlated (all six blocks at rest: -30.1 dBc):
+   radial velocity [m/s]     peak sidelobe in the zero zone [dBc]    peak [dB]    carrier turn over the TRN field [rad]
+                     0.0                                   -293.6       0.0000                                 0.00e+00
+                     2.0                                    -83.4      -0.0028                                 8.85e-02
+                    12.4                                    -67.5      -0.1092                                 5.49e-01
+                    50.0                                    -55.4      -1.8494                                 2.21e+00
+                   200.0                                    -43.4     -13.2721                                 8.85e+00
+  the peak column is the coherent loss inside one packet: the TRN field is long enough for a fast target to turn the carrier across it
 
 == 8. sensitivity: row B under the communication limit, closed form, one choice changed at a time ==
   packets per frame x 2 (jcas60.sensing_burst)                                                  +3.01 dB -> SNR(cell)  33.75 dB   velocity resolution twice as fine, air time x 2
@@ -141,6 +169,16 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   the L-STF correlated as well (jcas60.sensing_field)                                           +4.95 dB -> SNR(cell)  35.69 dB   its composition has no public source
   RCS at the top of the pedestrian range (target_rcs.deep2019_pedestrian_77g#co_pol_max_dbsm)  +15.00 dB -> SNR(cell)  45.74 dB   all three rows move together
   the communication transceiver's numbers (rx60.comm_asada2011: antenna, NF, TX P1dB)          -16.70 dB -> SNR(cell)  14.04 dB   antennas -16.0 dB, NF +5.9 dB, TX power -6.6 dB; row A is not recomputed on them
+  the TRN field's length, closed form, communication limit (the table uses 4 units: the fewest that reach row A's SNR):
+       TRN units  correlated chips  SNR(cell) [dB]  over row A [dB]  packet [us]  air time [%]
+               1              5120           37.73            -5.61         7.42          2.00
+               2             10240           40.74            -2.60        11.78          2.84
+               3             15360           42.50            -0.84        16.15          3.68
+               4             20480           43.75            +0.41        20.51          4.51
+               5             25600           44.72            +1.38        24.87          5.35
+               6             30720           45.51            +2.18        29.24          6.19
+               7             35840           46.18            +2.84        33.60          7.03
+               8             40960           46.76            +3.42        37.96          7.87
 
 == 9. this library's own choices (every entry of data/assumed.yaml; what would move is in each entry's note) ==
   jcas60.antenna_gain_dbi          {'tx': 10.0, 'rx': 10.0}  [assumed]
@@ -148,6 +186,7 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.channel                   {'number': 2, 'width_hz': 2160000000.0}  [assumed]
   jcas60.sensing_field             L-CEF：Gu512 与 Gv512 各做一次循环相关再相加；L-STF 不参与相关  [assumed]
   jcas60.sensing_packet            {'fields': ['l_stf_chips', 'l_cef_chips', 'l_header_chips', 'edmg_header_a_chips'], 'data_blocks': 0, 'trn_units': 0}  [assumed]
+  jcas60.trn_sensing               {'units': 4, 'correlated_blocks': [2, 3, 4, 5], 'golay': 'dmg.golay_sequences 的 Ga128 / Gb128', 'rotation': 'exp(j*pi*n/2)，接着前导的相位'}  [assumed]
   jcas60.sensing_burst             {'n_packets': 64, 'interval_s': 0.0001, 'frames_per_s': 30.0}  [assumed]
   jcas60.packet_overhead           {'sifs_per_packet': 1}  [assumed]
   jcas60.doppler_window            hann  [assumed]
@@ -161,7 +200,7 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.fmcw_airtime              FMCW 一帧的 chirp 串期间，这套前端不能通信  [assumed]
   jcas60.radar_reading_airtime     {'lower': '关断时间只管感知的发射：与按通信限值读时同一个占比', 'upper': '关断时间管这台设备的全部发射：任意 33 ms 里至少关断规定的时长'}  [assumed]
   jcas60.comm_limit_kind           average  [assumed]
-  jcas60.sim                       {'seed': 1, 'frames_averaged': 8, 'buffer_chips': 2048, 'exclude_doppler_bins': 4, 'exclude_range_lags': 8, 'cfar_guard': 2, 'cfar_train': 8, 'compression_span_db': 12, 'compression_step_db': 2}  [assumed]
+  jcas60.sim                       {'seed': 1, 'frames_averaged': 8, 'buffer_chips': 2048, 'exclude_doppler_bins': 4, 'ridge_doppler_bins': 2, 'exclude_range_lags': 8, 'cfar_guard': 2, 'cfar_train': 8, 'compression_span_db': 12, 'compression_step_db': 2}  [assumed]
 
 == 10. every reference read to build this table ==
   assumed.ay_sc_pulse#rolloff                                                      0.25 [assumed]
@@ -181,6 +220,11 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   edmg.sc_siso_preamble#l_cef_chips                                                1152 [spec]
   edmg.sc_siso_preamble#l_header_chips                                             1024 [spec]
   edmg.sc_siso_preamble#l_stf_chips                                                2176 [spec]
+  edmg.trn_field#basic_subfield                                                         [spec]
+  edmg.trn_field#edmg_trn_len_max                                                   255 [spec]
+  edmg.trn_field#golay_length                                                           [spec]
+  edmg.trn_field#trn_bl@trn_seq_length=normal                                       128 [spec]
+  edmg.trn_field#trn_r_packet                                                           [spec]
   fcc15255.band_high_hz                                                         7.1e+10 [spec]
   fcc15255.band_low_hz                                                          5.7e+10 [spec]
   fcc15255.eirp_avg_dbm                                                              40 [spec]
@@ -272,9 +316,12 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
   jcas60.sim#exclude_doppler_bins                                                       [assumed]
   jcas60.sim#exclude_range_lags                                                         [assumed]
   jcas60.sim#frames_averaged                                                            [assumed]
+  jcas60.sim#ridge_doppler_bins                                                         [assumed]
   jcas60.sim#seed                                                                       [assumed]
   jcas60.target#range_m                                                               5 [assumed]
   jcas60.target#velocity_mps                                                          2 [assumed]
+  jcas60.trn_sensing#correlated_blocks                                                  [assumed]
+  jcas60.trn_sensing#units                                                            4 [assumed]
   rx60.comm_asada2011#antenna_gain_dbi                                                2 [spec]
   rx60.comm_asada2011#nf_db                                                         6.1 [spec]
   rx60.comm_asada2011#tx_p1db_dbm                                                   5.4 [spec]
@@ -300,9 +347,15 @@ C  ay SC Golay field, bistatic              radar limit        1.16 % ... 50 % [
                                                                         entry (ieee80211bf.dmg_monostatic_ppdu): any DMG or EDMG PPDU
   B     the field the channel is read on       left open by the entry   here: the L-CEF (jcas60.sensing_field)
                                                                         entry (ieee80211bf.dmg_monostatic_ppdu): sensing on the TRN field: optional (monostatic and coordinated monostatic); which field otherwise is not a value of the entry
+  B     sensing on the TRN field               fits                     here: the TRN rows read the channel on the TRN field (20480 chips of it a packet)
+                                                                        entry (ieee80211bf.dmg_monostatic_ppdu): sensing on the TRN field: optional (monostatic and coordinated monostatic)
+  B, C  the TRN field's length                 fits                     here: 4 units of a TRN-R packet, 30720 chips
+                                                                        entry (edmg.trn_field): EDMG_TRN_LEN at most 255 units; a TRN-R packet's unit: L_T = 0, L_P = 0, L_M = 10
+  B, C  the TRN field's Golay pair and rotation left open by the entry   here: Ga128 / Gb128 of dmg.golay_sequences, turned like the preamble (jcas60.trn_sensing)
+                                                                        entry (edmg.trn_field): blocks +Ga_N -Gb_N +Ga_N +Gb_N +Ga_N -Gb_N of length TRN_BL*N_CB; the first stream's pair and the field's rotation are not values of the entry
   C     who transmits and who receives         fits                     here: one device transmits, the other correlates
                                                                         entry (ieee80211bf.dmg_sensing_types): bistatic: transmitter the initiator or the responder, receiver the other of the two
-  C     the PPDU                               no entry                 here: the same plain SC PPDU as row B, read on its L-CEF
+  C     the PPDU                               no entry                 here: the same PPDUs as row B: the plain SC packet read on its L-CEF, or with the TRN field behind it
                                                                         entry (ieee80211bf.dmg_sensing_types): the entries give a PPDU for the monostatic types and for the multistatic type, none for the bistatic type
   B, C  packets of one frame, start to start   fits                     here: 100 us
                                                                         entry (ieee80211bf.dmg_sensing_scheduling): intraburst interval: 1 octet, in us: at most 255 us

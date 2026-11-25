@@ -82,8 +82,12 @@ class _Bench:
 
     def __init__(self, s: Setup):
         self.s, self.sim = s, W.Simulator(s)
+        self.sim_trn = W.Simulator(s, s.trn_field)
         self.frames = int(s.sim["frames_averaged"])
         self.seed = int(s.sim["seed"])
+
+    def sim_for(self, field) -> W.Simulator:
+        return self.sim_trn if field is self.s.trn_field else self.sim
 
     def paths(self, kind: str, link: B.Link, strong_dbm: float, velocity: float | None = None):
         g = B.geometry(self.s, kind)
@@ -97,8 +101,9 @@ class _Bench:
             kw = {"random_packet_phase": True, "reference_lag": 0, **kw}
         return W.Options(seed=self.seed, **kw)
 
-    def read(self, paths, opt, near, strong=(0,)) -> dict:
-        rs = [self.sim.read(self.sim.frame(paths, opt, k), near, strong) for k in range(self.frames)]
+    def read(self, paths, opt, near, strong=(0,), sim=None) -> dict:
+        sim = sim or self.sim
+        rs = [sim.read(sim.frame(paths, opt, k), near, strong) for k in range(self.frames)]
         return {"snr_db": float(np.mean([r["snr_db"] for r in rs])), "peak_dbm": db(float(np.mean([r["peak_mw"] for r in rs]))),
                 "floor_dbm": db(float(np.mean([r["floor_mw"] for r in rs]))), "ridge_dbm": db(float(np.mean([r["ridge_mw"] for r in rs]))),
                 "first": rs[0]}
@@ -112,21 +117,23 @@ def strong_path_dbm(s: Setup, kind: str, eirp: Num, isolation: Num | None = None
     return derive(eirp.value + s.fe.rx_gain_dbi.value - loss, "EIRP + G_r - (4 pi L / lambda)^2 - oxygen over L", eirp, s.fe.rx_gain_dbi, s.bi_baseline_m, s.carrier_hz, unit="dBm")
 
 
-def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num, snr_req: Num) -> dict:
-    fe, sim = s.fe, bench.sim
+def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num, snr_req: Num, field=None) -> dict:
+    field = s.field if field is None else field
+    on_trn = field is s.trn_field
+    fe, sim = s.fe, bench.sim_for(field)
     eirp = reading.eirp_dbm
-    link = B.link(s, kind, eirp)
+    link = B.link(s, kind, eirp, field=field)
     g = B.geometry(s, kind)
     lam = s.wavelength_m
     m, t_int = s.n_packets.value, s.interval_s.value
     width_chips = B.width_at_half_power_chips(s.rolloff.value)
-    zone_m = s.field.zero_sidelobe_chips * s.chip_m * 2.0          # of path length
+    zone_m = field.zero_sidelobe_chips * s.chip_m * 2.0            # of path length
     r_max = zone_m / 2.0 if kind == "monostatic" else (zone_m + g.baseline_m) / 2.0
     iso_best = fe.isolation_db[-1][1]
     strong = strong_path_dbm(s, kind, eirp, iso_best if kind == "monostatic" else None)
     _, tgt, st = bench.paths(kind, link, strong.value)
     near = int(round(g.delay_s * sim.fs))
-    meas = bench.read([tgt, st], bench.options(kind), near)
+    meas = bench.read([tgt, st], bench.options(kind), near, sim=sim)
     fr = sim.frame([tgt, st], bench.options(kind), 0)
     i, lag = meas["first"]["doppler_index"], meas["first"]["lag"]
     j = lag - sim.lag_lo
@@ -135,22 +142,23 @@ def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num, snr
     v_read = _rd.read_peak(sim.velocity_axis(g)[i - 3: i + 4], p_db[i - 3: i + 4, j])["peak_pos"]
     det = sim.cfar(fr, pfa.value)
     jc = (j - (-sim.lag_lo) % sim.osr) // sim.osr
-    r_snr = B.detection_range_m(s, kind, eirp, snr_req)
-    air = R.air_time(s, reading)
+    r_snr = B.detection_range_m(s, kind, eirp, snr_req, field)
+    air = R.air_time(s, reading, field)
     sim_snr = derive(meas["snr_db"], f"waveform simulation, mean of {bench.frames} frames: peak / floor of the range-Doppler map", eirp, s.n_packets, unit="dB")
     row = {
-        "name": f"{'B' if kind == 'monostatic' else 'C'}  ay SC Golay field, {kind}", "limit": reading.name, "kind": kind,
+        "name": f"{'B' if kind == 'monostatic' else 'C'}  ay {'TRN field' if on_trn else 'L-CEF'}, {kind}", "limit": reading.name, "kind": kind,
+        "field": "TRN field" if on_trn else "L-CEF", "packet_s": s.packet_seconds(field),
         "bandwidth_hz": s.chip_rate_hz,
         "range_res_m": derive(s.chip_m / g.cos_half_beta, "c / (2 Rc cos(beta/2))", s.chip_rate_hz, s.bi_baseline_m if kind == "bistatic" else s.chip_rate_hz, unit="m"),
         "range_width_m": derive(width_chips * s.chip_m / g.cos_half_beta, "-3 dB width of the raised-cosine pulse", s.chip_rate_hz, s.rolloff, unit="m"),
         "range_window": "none (the pulse)",
         "range_max_m": derive(r_max, "cyclic prefix x c / Rc" + (" / 2" if kind == "monostatic" else ", as distance from both devices"),
                               *((s.chip_rate_hz,) if kind == "monostatic" else (s.chip_rate_hz, s.bi_baseline_m)), unit="m"),
-        "range_max_why": f"the {s.field.zero_sidelobe_chips}-chip cyclic prefix",
+        "range_max_why": f"the {field.zero_sidelobe_chips}-chip " + ("guard block either side of the correlated blocks" if on_trn else "cyclic prefix"),
         "velocity_res_mps": derive(lam / (2.0 * m * t_int * g.cos_half_beta), "lambda / (2 M T cos(beta/2))", s.n_packets, s.interval_s, s.carrier_hz, unit="m/s"),
         "velocity_max_mps": derive(lam / (4.0 * t_int * g.cos_half_beta), "lambda / (4 T cos(beta/2))", s.interval_s, s.carrier_hz, unit="m/s"),
         "eirp_dbm": eirp,
-        "processing_gain_db": link.processing_gain_db, "processing_what": f"{s.field.n_correlated} chips x {m:.0f} packets",
+        "processing_gain_db": link.processing_gain_db, "processing_what": f"{field.n_correlated} chips x {m:.0f} packets",
         "window_loss_db": link.window_loss_db,
         "snr_db": link.snr_cell_db, "pd": derive(B.pd_at(link.snr_cell_db.value, pfa.value), "Pd(SNR, Pfa), Swerling 0", link.snr_cell_db, pfa), "pfa": pfa,
         "range_pd_m": r_snr,
@@ -275,19 +283,21 @@ def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
             "pn_rise_sim_db": pn["floor_dbm"] - lin["floor_dbm"], "pn_snr_change_db": pn["snr_db"] - lin["snr_db"]}
 
 
-def golay_under_doppler(s: Setup, bench: _Bench, velocities) -> list:
+def golay_under_doppler(s: Setup, bench: _Bench, velocities, sim=None, span_chips: int | None = None) -> list:
     """Peak sidelobe of the summed correlations at the chip-spaced lags of the zero-sidelobe zone, one packet, no
-    noise, the target on a chip: what the pair's complementarity is worth when the target moves."""
-    sim, out = bench.sim, []
+    noise, the target on a chip: what the pair's complementarity is worth when the target moves.  The last column
+    is the carrier's turn over ``span_chips`` (default: one correlation window of the simulator's field)."""
+    sim, out = sim or bench.sim, []
+    span = len(sim.field.windows[0][1]) if span_chips is None else span_chips
     delay_chips = round(B.geometry(s, "monostatic").delay_s * s.chip_rate_hz.value)
     for v in velocities:
         fr = sim.frame([W.Path(0.0, delay_chips / s.chip_rate_hz.value, 2.0 * v)], W.Options(noise=False, n_packets=1))
         h = np.abs(fr.cir[0]) ** 2
         chip = h[fr.lag0 % sim.osr:: sim.osr]
         lags = sim.lags[fr.lag0 % sim.osr:: sim.osr] // sim.osr
-        zone = (lags >= 0) & (lags <= s.field.zero_sidelobe_chips) & (lags != delay_chips)
+        zone = (lags >= 0) & (lags <= sim.field.zero_sidelobe_chips) & (lags != delay_chips)
         peak = float(chip[lags == delay_chips][0])
-        turn = 2.0 * math.pi * (2.0 * v / s.wavelength_m) * len(s.field.windows[0][1]) / s.chip_rate_hz.value
+        turn = 2.0 * math.pi * (2.0 * v / s.wavelength_m) * span / s.chip_rate_hz.value
         out.append((float(v), db(float(chip[zone].max()) / peak + 1e-40), db(peak), turn))
     return out
 
@@ -314,6 +324,28 @@ def measured_width_chips(s: Setup, bench: _Bench) -> float:
     left = np.interp(-3.0103, y[: offs.size // 2 + 1], offs[: offs.size // 2 + 1])
     right = np.interp(-3.0103, y[offs.size // 2:][::-1], offs[offs.size // 2:][::-1])
     return float(right - left)
+
+
+def _all_blocks(s: Setup):
+    """The TRN field with every block of the subfield correlated, guards included: what the choice of blocks 2-5 avoids."""
+    from . import field as F
+    return F.trn(int(s.trn_units.value), tuple(range(1, len(S.raw("edmg.trn_field#basic_subfield")) + 1)))
+
+
+def trn_sweep(s: Setup, reading: R.Reading, snr_a_db: float) -> list:
+    """Closed form, monostatic under the communication limit: (TRN units, correlated chips, SNR, SNR over row A's,
+    packet duration, share of the air time) for 1 .. 8 units, the blocks correlated as in the table."""
+    from . import field as F
+    blocks = tuple(int(b) for b in S.raw("jcas60.trn_sensing#correlated_blocks"))
+    base = B.link(s, "monostatic", reading.eirp_dbm)
+    per_packet = S.num("jcas60.packet_overhead#sifs_per_packet").value * s.sifs_s.value
+    out = []
+    for units in range(1, 9):
+        f = F.trn(units, blocks)
+        snr = base.snr_cell_db.value + db(f.n_correlated / s.field.n_correlated)
+        t_packet = (s.packet_chips.value + f.chips.size) / s.chip_rate_hz.value
+        out.append((units, f.n_correlated, snr, snr - snr_a_db, t_packet, (t_packet + per_packet) * s.n_packets.value * s.frames_per_s.value))
+    return out
 
 
 def sensitivity(s: Setup, reading: R.Reading, pfa: float) -> list:
@@ -349,7 +381,9 @@ def build() -> dict:
     bench = _Bench(s)
     a = row_a()
     comm, radar = R.readings(s)
+    comm_t, radar_t = R.readings(s, s.trn_field)                 # the same limits; the burst is longer by the TRN field
     rows = [a] + [row_ay(s, bench, kind, rd_, a["pfa"], a["snr_required_db"]) for kind in ("monostatic", "bistatic") for rd_ in (comm, radar)]
+    rows += [row_ay(s, bench, kind, rd_, a["pfa"], a["snr_required_db"], s.trn_field) for kind in ("monostatic", "bistatic") for rd_ in (comm_t, radar_t)]
     v_max = rows[1]["velocity_max_mps"].value
     return {
         "setup": s, "rows": rows, "readings": (comm, radar),
@@ -357,6 +391,9 @@ def build() -> dict:
         "monostatic": [monostatic_block(s, bench, r, sweep) for r in (comm, radar)],
         "bistatic": [bistatic_block(s, bench, r) for r in (comm, radar)],
         "golay": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0)),
+        "golay_trn": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0), bench.sim_trn, s.trn_field.chips.size),
+        "golay_trn_all_blocks": golay_under_doppler(s, bench, (0.0,), W.Simulator(s, _all_blocks(s)))[0][1],
+        "trn_sweep": trn_sweep(s, comm, a["snr_db"].value),
         "pulse_sidelobes": pulse_sidelobes(s, bench), "width_measured_chips": measured_width_chips(s, bench),
         "sensitivity": sensitivity(s, comm, a["pfa"].value),
         "bf": bf.checks(s),
@@ -420,6 +457,8 @@ def render(t: dict | None = None) -> str:
       f"roll-off {s.rolloff.show('g')} (assumed.ay_sc_pulse, mmw60_trx)")
     w(f"  range sidelobes: A {a['range_sidelobe_db'].value:.1f} dB ({a['range_window']} window); ay, between the chips, the pulse's own: "
       + ", ".join(f"{lvl:.1f} dB at {off:g} chips" for off, lvl in t["pulse_sidelobes"]) + " (waveform simulation; no range window is applied)")
+    w(f"  the TRN rows (B and C sensed on an EDMG TRN-R field of {s.trn_units.show('g')} units = {s.trn_field.chips.size} chips behind the same packet) have these same figures: the field changes the gain, "
+      f"not the pulse or the burst; their clean range is by {rows[5]['range_max_why']} ({rows[5]['range_max_m'].value:.2f} m)")
     w(f"  bistatic (C): legs {s.bi_r_tx_m.value:g} m and {s.bi_r_rx_m.value:g} m, baseline {s.bi_baseline_m.value:g} m, bistatic angle "
       f"{2 * math.degrees(math.acos(B.geometry(s, 'bistatic').cos_half_beta)):.0f} deg; resolutions are along the bisector (jcas60.bistatic_geometry)")
     w("")
@@ -440,6 +479,9 @@ def render(t: dict | None = None) -> str:
         w(f"  row A over row B, {r['limit']}: {gap:+.2f} dB with {r['eirp_dbm'].value - a['eirp_dbm'].value:g} dB less EIRP: its frame is on the target for {A.get('compliance.frame_on_s') * 1e3:g} ms, "
           f"the ay frame's correlated chips for {s.field.n_correlated * s.n_packets.value / s.chip_rate_hz.value * 1e6:.1f} us; equal SNR takes x{10.0 ** (gap / 10.0):.1f} the chips, "
           f"{chips / s.chip_rate_hz.value * 1e3:.2f} ms a frame ({chips / s.chip_rate_hz.value * s.frames_per_s.value * 100:.1f} % of the time, training alone)")
+    for r in (rows[5], rows[6]):
+        w(f"  row B on the TRN field against row A, {r['limit']}: {r['snr_db'].value - a['snr_db'].value:+.2f} dB with {r['eirp_dbm'].value - a['eirp_dbm'].value:g} dB more EIRP: "
+          f"{s.trn_field.n_correlated} chips a packet, {s.trn_field.n_correlated * s.n_packets.value / s.chip_rate_hz.value * 1e3:.3f} ms of correlated chips a frame")
     b1 = rows[1]["link"]
     w(f"  the ay budget, monostatic at {rows[1]['eirp_dbm'].value:g} dBm: spreading {b1.spreading_db.value:.2f} dB, oxygen {b1.oxygen_db.value:.2f} dB, echo {b1.p_rx_dbm.value:.2f} dBm, "
       f"noise in {s.chip_rate_hz.value / 1e9:g} GHz {b1.noise_chip_dbm.value:.2f} dBm, SNR per chip {b1.snr_chip_db.value:.2f} dB")
@@ -504,6 +546,8 @@ def render(t: dict | None = None) -> str:
         w(f"      {r['level_dbm']:14.0f} {r['snr_closed_db']:12.2f} {r['snr_sim_db']:14.2f} {r['signal_closed_db']:12.2f} {r['signal_sim_db']:15.2f} {r['image_closed_dbc']:18.1f} {r['image_sim_dbc']:16.1f} {r['row_sidelobe_sim_dbc']:16.1f}")
     w(f"      with another knee the {s.desense_allowed_db.value:g} dB criterion moves ({t['monostatic'][0]['reading']}): "
       + "; ".join(f"p = {p:g}: {'never reached' if need is None else format(need, '.1f') + ' dB'}" for p, need in t["monostatic"][0]["need_by_p"]))
+    w(f"  the TRN rows pay the same three: the leakage (or the direct path) is at the same level whatever field is sensed on; the receiver is on for "
+      f"{s.trn_field.chips.size / s.chip_rate_hz.value * 1e6:.1f} us of TRN field a packet instead of {s.field.chips.size / s.chip_rate_hz.value * 1e6:.2f} us of L-CEF")
     for blk in t["bistatic"]:
         w(f"  C, {blk['reading']}: direct path {blk['direct_dbm'].value:.1f} dBm {blk['direct_dbm'].label}, {blk['under_p1db_db'].value:.1f} dB under the in-band P1dB; ENOB needed {blk['enob_needed'].value:.2f}; "
           f"independent LOs after referencing to the direct path: residual {blk['pn_residual_dbc']:.1f} dBc, floor rise closed {blk['pn_rise_closed_db']:.2f} dB / simulated {blk['pn_rise_sim_db']:.2f} dB (SNR {blk['pn_snr_change_db']:+.2f} dB); "
@@ -517,7 +561,8 @@ def render(t: dict | None = None) -> str:
         loss = f"{r['loss_mbps'].value:.0f}" + ("" if r["loss_upper_mbps"] is None else f" ... {r['loss_upper_mbps'].value:.0f}") + f" {r['loss_mbps'].label}"
         w(f"{r['name']:34s} {r['limit']:>20s} {share:>40s} {loss:>40s}")
     w(f"  A: the frame's {A.get('compliance.frame_on_s') * 1e3:g} ms of chirps, during which this front end cannot communicate (jcas60.fmcw_airtime)")
-    w(f"  ay: {s.n_packets.value:g} packets of {s.packet_chips.value:g} chips ({s.packet_s.value * 1e6:.3f} us) plus one SIFS ({s.sifs_s.value * 1e6:g} us) each; under the radar reading the upper figure is the off-time "
+    w(f"  ay: {s.n_packets.value:g} packets of {s.packet_chips.value:g} chips ({s.packet_s.value * 1e6:.3f} us; with the TRN field {s.trn_packet_chips.value:g} chips, {rows[5]['packet_s'].value * 1e6:.3f} us) "
+      f"plus one SIFS ({s.sifs_s.value * 1e6:g} us) each; under the radar reading the upper figure is the off-time "
       "taken to bind every emission of the device (jcas60.radar_reading_airtime); C's figure is the transmitting device's")
     w("")
     w("== 7. a Golay pair's sidelobes when the target moves (waveform simulation: one packet, no noise, target on a chip) ==")
@@ -525,10 +570,20 @@ def render(t: dict | None = None) -> str:
     for v, side, peak, turn in t["golay"]:
         w(f"{v:24.1f} {side:40.1f} {peak:12.4f} {turn:40.2e}")
     w(f"  0 m/s is the pair's exact cancellation at double precision; {t['golay'][2][0]:g} m/s is the unambiguous velocity of section 1")
+    w(f"  the TRN field, blocks {'-'.join(str(b) for b in (S.raw('jcas60.trn_sensing#correlated_blocks')[0], S.raw('jcas60.trn_sensing#correlated_blocks')[-1]))} of every subfield correlated "
+      f"(all six blocks at rest: {t['golay_trn_all_blocks']:.1f} dBc):")
+    w(f"{'radial velocity [m/s]':>24s} {'peak sidelobe in the zero zone [dBc]':>40s} {'peak [dB]':>12s} {'carrier turn over the TRN field [rad]':>40s}")
+    for v, side, peak, turn in t["golay_trn"]:
+        w(f"{v:24.1f} {side:40.1f} {peak:12.4f} {turn:40.2e}")
+    w("  the peak column is the coherent loss inside one packet: the TRN field is long enough for a fast target to turn the carrier across it")
     w("")
     w("== 8. sensitivity: row B under the communication limit, closed form, one choice changed at a time ==")
     for what, d, snr, note in t["sensitivity"]:
         w(f"  {what:92s} {d:+6.2f} dB -> SNR(cell) {snr:6.2f} dB   {note}")
+    w(f"  the TRN field's length, closed form, communication limit (the table uses {s.trn_units.value:g} units: the fewest that reach row A's SNR):")
+    w(f"      {'TRN units':>10s} {'correlated chips':>17s} {'SNR(cell) [dB]':>15s} {'over row A [dB]':>16s} {'packet [us]':>12s} {'air time [%]':>13s}")
+    for units, chips, snr, over, t_pkt, share in t["trn_sweep"]:
+        w(f"      {units:10d} {chips:17d} {snr:15.2f} {over:+16.2f} {t_pkt * 1e6:12.2f} {share * 100:13.2f}")
     w("")
     w("== 9. this library's own choices (every entry of data/assumed.yaml; what would move is in each entry's note) ==")
     for k, e in S.assumed_entries().items():

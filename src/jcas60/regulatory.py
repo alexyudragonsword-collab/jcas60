@@ -66,8 +66,8 @@ def radar_check(band_hz, n_bursts: int, burst_s: float, pri_s: float, frame_peri
     return run(max(0.0, tx_dbm.value + gain.value - first.eirp_cap_dbm))
 
 
-def radar(s: Setup) -> Reading:
-    res = radar_check(s.band_hz, int(s.n_packets.value), s.packet_s.value, s.interval_s.value, 1.0 / s.frames_per_s.value,
+def radar(s: Setup, field=None) -> Reading:
+    res = radar_check(s.band_hz, int(s.n_packets.value), s.packet_seconds(field or s.field).value, s.interval_s.value, 1.0 / s.frames_per_s.value,
                       s.fe.tx_power_dbm, s.fe.tx_gain_dbi)
     g = res.tier
     if g is None or not g.compliant:
@@ -79,8 +79,8 @@ def radar(s: Setup) -> Reading:
                    g.off_time, need, win, g.off_time_have_s, g.label, res)
 
 
-def readings(s: Setup) -> tuple[Reading, Reading]:
-    return communication(s), radar(s)
+def readings(s: Setup, field=None) -> tuple[Reading, Reading]:
+    return communication(s), radar(s, field)
 
 
 # ----------------------------------------------------------------------------- air time
@@ -105,11 +105,12 @@ def comm_rate_mbps() -> Num:
     raise ValueError("mmw60_trx's comparison table no longer has the ay_sc row in the form read here")
 
 
-def air_time(s: Setup, reading: Reading) -> AirTime:
+def air_time(s: Setup, reading: Reading, field=None) -> AirTime:
     rate = comm_rate_mbps()
-    per_packet = s.packet_s.value + S.num("jcas60.packet_overhead#sifs_per_packet").value * s.sifs_s.value
+    packet = s.packet_seconds(field or s.field)
+    per_packet = packet.value + S.num("jcas60.packet_overhead#sifs_per_packet").value * s.sifs_s.value
     frac = derive(per_packet * s.n_packets.value * s.frames_per_s.value, "(packet + SIFS) x packets x frames per second",
-                  s.packet_s, s.sifs_s, s.n_packets, s.frames_per_s)
+                  packet, s.sifs_s, s.n_packets, s.frames_per_s)
     upper = None
     if reading.off_time_required_s is not None:
         upper = derive(reading.off_time_required_s.value / reading.off_time_window_s.value, "off-time required / window",

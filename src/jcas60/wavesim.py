@@ -80,13 +80,15 @@ class Frame:
 
 
 class Simulator:
-    def __init__(self, s: Setup):
+    def __init__(self, s: Setup, field=None):
         self.s = s
+        self.field = f = s.field if field is None else field
         self.osr = int(s.adc_osr.value)
         self.n_chips = int(s.sim["buffer_chips"])
+        while self.n_chips < f.chips.size + f.zero_sidelobe_chips + 2 * 64:        # a longer field gets the next power of two
+            self.n_chips *= 2
         self.n = self.n_chips * self.osr
         self.fs = self.osr * s.chip_rate_hz.value
-        f = s.field
         self.start = (self.n_chips - f.chips.size) // 2          # chip index of the field's first chip in the buffer
         need = f.chips.size + f.zero_sidelobe_chips + 2 * 64
         if self.n_chips < need:
@@ -104,9 +106,18 @@ class Simulator:
         # correlation: lags -8 chips .. zero-sidelobe zone + 8 chips, in samples
         self.lag_lo = -8 * self.osr
         self.lags = np.arange(self.lag_lo, (f.zero_sidelobe_chips + 8) * self.osr + 1)
-        self._idx = [((self.start + w0) * self.osr + np.arange(len(ref))[None, :] * self.osr + self.lags[:, None], np.conj(ref))
-                     for w0, ref in f.windows]
         self._norm = f.n_correlated
+        # two ways to the same sums: gathering every window at every lag (the L-CEF: two windows), or one FFT against
+        # a template that holds the references at their places (a long field: its gathers would be millions of samples)
+        self._by_fft = self.lags.size * f.n_correlated > 1_000_000
+        if self._by_fft:
+            tmpl = np.zeros(self.n, dtype=complex)
+            for w0, ref in f.windows:
+                tmpl[(self.start + w0) * self.osr: (self.start + w0 + len(ref)) * self.osr: self.osr] = ref
+            self._tmpl_f = np.conj(np.fft.fft(tmpl))
+        else:
+            self._idx = [((self.start + w0) * self.osr + np.arange(len(ref))[None, :] * self.osr + self.lags[:, None], np.conj(ref))
+                         for w0, ref in f.windows]
 
     # ------------------------------------------------------------------ pieces
     def _phase_noise(self, rng: np.random.Generator) -> np.ndarray:
@@ -132,12 +143,15 @@ class Simulator:
     def unit_envelope(self) -> np.ndarray:
         """The transmitted field's envelope at unit mean power, one value per sample of the field: what a strong
         static path (the leakage) looks like to the receiver's compression, up to its level."""
-        seg = slice(self.start * self.osr, (self.start + self.s.field.chips.size) * self.osr)
+        seg = slice(self.start * self.osr, (self.start + self.field.chips.size) * self.osr)
         return np.abs(np.fft.ifft(self.tx_f)[seg]) / math.sqrt(self.tx_power)
 
     def correlate(self, y: np.ndarray) -> np.ndarray:
         """Matched filter, then the summed cyclic correlations at every lag."""
-        z = np.fft.ifft(np.fft.fft(y) * self.rrc)
+        zf = np.fft.fft(y) * self.rrc
+        if self._by_fft:                                           # sum_n z[n + lag] conj(t[n]) at every lag, the wanted ones picked out
+            return np.fft.ifft(zf * self._tmpl_f)[self.lags % self.n] / self._norm
+        z = np.fft.ifft(zf)
         return sum(z[idx] @ ref for idx, ref in self._idx) / self._norm
 
     # ------------------------------------------------------------------ one frame
@@ -151,7 +165,7 @@ class Simulator:
         cir = np.empty((m, self.lags.size), dtype=complex)
         full_scale = None
         errors = []
-        seg = slice(self.start * self.osr, (self.start + s.field.chips.size) * self.osr)
+        seg = slice(self.start * self.osr, (self.start + self.field.chips.size) * self.osr)
         for k in range(m):
             t_k = k * s.interval_s.value
             tx_f = self.tx_f
@@ -220,17 +234,20 @@ class Simulator:
         m = p.shape[0]
         j0 = near_lag - self.lag_lo
         ex_d, ex_r = int(s.sim["exclude_doppler_bins"]), int(s.sim["exclude_range_lags"]) * self.osr
-        rows, cols = np.ones(m, dtype=bool), np.ones(p.shape[1], dtype=bool)
+        rows, cols, search = np.ones(m, dtype=bool), np.ones(p.shape[1], dtype=bool), np.ones(m, dtype=bool)
         if strong_lags:
-            rows[np.abs(np.arange(m) - m // 2) <= ex_d] = False            # the zero-Doppler ridge (the map is centred)
-        win = np.where(rows[:, None], p[:, j0 - 2 * self.osr: j0 + 2 * self.osr + 1], 0.0)     # the peak is looked for off the ridge
+            off = np.abs(np.arange(m) - m // 2)                            # Doppler bins from zero (the map is centred)
+            rows[off <= ex_d] = False                                      # the floor is read well away from the ridge ...
+            search[off <= int(s.sim["ridge_doppler_bins"])] = False        # ... the peak only off the window's main lobe around it:
+            # a slow target a few bins out is still a peak (the bistatic row's sits at 4.5 bins)
+        win = np.where(search[:, None], p[:, j0 - 2 * self.osr: j0 + 2 * self.osr + 1], 0.0)
         i, dj = np.unravel_index(int(np.argmax(win)), win.shape)
         j = j0 - 2 * self.osr + int(dj)
         for lag in strong_lags:
             cols[max(0, lag - self.lag_lo - ex_r): lag - self.lag_lo + ex_r + 1] = False
         r_idx, c_idx = np.flatnonzero(rows), np.flatnonzero(cols)
         sub = p[np.ix_(r_idx, c_idx)]
-        floor = _rd.noise_floor(sub, (int(np.searchsorted(r_idx, i)), int(np.searchsorted(c_idx, j))), (ex_d, ex_r))
+        floor = _rd.noise_floor(sub, (int(np.argmin(np.abs(r_idx - i))), int(np.searchsorted(c_idx, j))), (ex_d, ex_r))
         # the target's own Doppler row away from its peak (range sidelobes: what a gain that follows the strong path's
         # envelope scatters the echo into) and the mirrored Doppler at the target's lag (a limiter's image)
         far = cols & (np.abs(np.arange(p.shape[1]) - j) > ex_r)

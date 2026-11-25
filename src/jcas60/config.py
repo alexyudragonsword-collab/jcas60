@@ -34,6 +34,9 @@ class Setup:
     rolloff: Num
     field: F.Field
     packet_chips: Num
+    trn_field: F.Field             # the same packet with an EDMG TRN-R field behind it, sensed on that field
+    trn_units: Num
+    trn_packet_chips: Num
     sifs_s: Num
     # the sensing burst
     n_packets: Num
@@ -77,6 +80,11 @@ class Setup:
         return derive(self.packet_chips.value / self.chip_rate_hz.value, "packet chips / chip rate",
                       self.packet_chips, self.chip_rate_hz, unit="s")
 
+    def packet_seconds(self, field: F.Field) -> Num:
+        """The sensing packet's duration when ``field`` is the one sensed on (the TRN field rides behind the packet)."""
+        chips = self.trn_packet_chips if field is self.trn_field else self.packet_chips
+        return derive(chips.value / self.chip_rate_hz.value, "packet chips / chip rate", chips, self.chip_rate_hz, unit="s")
+
     @property
     def adc_fs_hz(self) -> Num:
         return derive(self.adc_osr.value * self.chip_rate_hz.value, "samples per chip x chip rate",
@@ -104,15 +112,19 @@ def setup() -> Setup:
     oxygen = S.num(f"itu_p676.gamma_o_dry_sea_level#db_per_km@f_ghz={carrier.value / 1e9:g}", "dB/km")     # at the channel's centre
     if str(S.raw("assumed.ay_sc_pulse#shape")) != "root-raised-cosine":
         raise ValueError("mmw60_trx's SC pulse is no longer a root-raised cosine: jcas60's pulse model does not fit it")
-    sim = {k: S.raw(f"jcas60.sim#{k}") for k in ("seed", "frames_averaged", "buffer_chips", "exclude_doppler_bins",
+    sim = {k: S.raw(f"jcas60.sim#{k}") for k in ("seed", "frames_averaged", "buffer_chips", "exclude_doppler_bins", "ridge_doppler_bins",
                                                 "exclude_range_lags", "cfar_guard", "cfar_train", "compression_span_db", "compression_step_db")}
+    units = S.num("jcas60.trn_sensing#units")
+    trn = F.trn(int(units.value), tuple(int(b) for b in S.raw("jcas60.trn_sensing#correlated_blocks")))
+    trn_packet = derive(packet.value + trn.chips.size, "packet + TRN units x subfields per unit x 6 TRN_BL", packet, units,
+                        S.num("edmg.trn_field#trn_bl@trn_seq_length=normal"), unit="chips")
     return Setup(
         fe=shared(),
         range_m=S.num("jcas60.target#range_m", "m"), velocity_mps=S.num("jcas60.target#velocity_mps", "m/s"),
         rcs_dbsm=S.num("target_rcs.deep2019_pedestrian_77g#co_pol_min_dbsm", "dBsm"), oxygen_db_per_km=oxygen,
         carrier_hz=carrier, chip_rate_hz=S.num("edmg.sc_params#chip_rate_hz", "Hz"),
         channel_width_hz=S.num("jcas60.channel#width_hz", "Hz"), rolloff=S.num("assumed.ay_sc_pulse#rolloff"),
-        field=F.l_cef(), packet_chips=packet, sifs_s=S.num("dmg.phy_timing#sifs_s", "s"),
+        field=F.l_cef(), packet_chips=packet, trn_field=trn, trn_units=units, trn_packet_chips=trn_packet, sifs_s=S.num("dmg.phy_timing#sifs_s", "s"),
         n_packets=S.num("jcas60.sensing_burst#n_packets"), interval_s=S.num("jcas60.sensing_burst#interval_s", "s"),
         frames_per_s=S.num("jcas60.sensing_burst#frames_per_s", "1/s"), doppler_window=str(S.raw("jcas60.doppler_window")),
         adc_osr=S.num("jcas60.adc#samples_per_chip"), desense_allowed_db=S.num("jcas60.adc#desense_allowed_db", "dB"),

@@ -151,8 +151,9 @@ def on_grid(s: Setup, g: Geometry, lags_per_chip: int) -> tuple[float, int, int]
     return best
 
 
-def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None) -> Link:
+def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None, field=None) -> Link:
     g = geometry(s, kind, range_m)
+    field = s.field if field is None else field
     fe = s.fe
     spread = derive(spreading_loss_db(s.wavelength_m, g), "(4 pi)^3 R_t^2 R_r^2 / lambda^2", s.carrier_hz, s.range_m, unit="dB")
     oxy = derive(s.oxygen_db_per_km.value * g.path_m / 1e3, "gamma_o (R_t + R_r)", s.oxygen_db_per_km, s.range_m, unit="dB")
@@ -161,7 +162,8 @@ def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None) -> Link:
     n0 = fe.noise_density_dbm_hz
     noise = derive(n0.value + db(s.chip_rate_hz.value), "k T0 F Rc", n0, s.chip_rate_hz, unit="dBm")
     snr_chip = derive(p_rx.value - noise.value, "P_r / (N0 Rc)", p_rx, noise, unit="dB")
-    pg = derive(db(s.field.n_correlated * s.n_packets.value), "10 log10(correlated chips x packets)", s.n_packets, s.chip_rate_hz, unit="dB")
+    pg = derive(db(field.n_correlated * s.n_packets.value), "10 log10(correlated chips x packets)", s.n_packets, s.chip_rate_hz,
+                *((s.trn_units,) if field is s.trn_field else ()), unit="dB")
     wl = derive(db(enbw_bins(_window(s))), "10 log10(ENBW of the Doppler window)", s.n_packets, unit="dB")
     matched = derive(snr_chip.value + pg.value, "SNR(chip) + processing gain", snr_chip, pg, unit="dB")
     cell = derive(matched.value - wl.value, "SNR(chip) + processing gain - window loss", matched, wl, unit="dB")
@@ -193,9 +195,9 @@ def range_for_snr(snr_of_range, snr_req_db: float, lo: float = 0.5, hi: float = 
     return 0.5 * (lo + hi)
 
 
-def detection_range_m(s: Setup, kind: str, eirp: Num, snr_req_db: Num) -> Num:
+def detection_range_m(s: Setup, kind: str, eirp: Num, snr_req_db: Num, field=None) -> Num:
     """The range at which the cell SNR falls to ``snr_req_db`` (the table hands every row the same one)."""
-    r = range_for_snr(lambda x: link(s, kind, eirp, x).snr_cell_db.value, snr_req_db.value)
+    r = range_for_snr(lambda x: link(s, kind, eirp, x, field).snr_cell_db.value, snr_req_db.value)
     return derive(r, "SNR(cell)(R) = the required SNR", eirp, snr_req_db, s.pd, s.fe.nf_db, s.fe.rx_gain_dbi, s.rcs_dbsm, s.n_packets, unit="m")
 
 

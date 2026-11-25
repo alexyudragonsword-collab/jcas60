@@ -17,6 +17,7 @@ from __future__ import annotations
 from . import sources as S
 from .config import Setup
 
+TRN = "edmg.trn_field"
 TYPES = "ieee80211bf.dmg_sensing_types"
 SCHED = "ieee80211bf.dmg_sensing_scheduling"
 MONO = "ieee80211bf.dmg_monostatic_ppdu"
@@ -55,12 +56,22 @@ def checks(s: Setup) -> list[dict]:
         {"row": "B", "item": "the field the channel is read on", "key": MONO,
          "entry": f"sensing on the TRN field: {S.raw(MONO + '#trn_based_sensing')}; which field otherwise is not a value of the entry",
          "here": "the L-CEF (jcas60.sensing_field)", "verdict": OPEN},
+        {"row": "B", "item": "sensing on the TRN field", "key": MONO,
+         "entry": f"sensing on the TRN field: {S.raw(MONO + '#trn_based_sensing')}",
+         "here": f"the TRN rows read the channel on the TRN field ({s.trn_field.n_correlated} chips of it a packet)", "verdict": FITS},
+        {"row": "B, C", "item": "the TRN field's length", "key": TRN,
+         "entry": f"EDMG_TRN_LEN at most {S.num(TRN + '#edmg_trn_len_max').value:g} units; a TRN-R packet's unit: {S.raw(TRN + '#trn_r_packet')}",
+         "here": f"{s.trn_units.value:g} units of a TRN-R packet, {s.trn_field.chips.size} chips",
+         "verdict": FITS if s.trn_units.value <= S.num(TRN + '#edmg_trn_len_max').value else "does not fit"},
+        {"row": "B, C", "item": "the TRN field's Golay pair and rotation", "key": TRN,
+         "entry": f"blocks {' '.join(S.raw(TRN + '#basic_subfield'))} of length {S.raw(TRN + '#golay_length')}; the first stream's pair and the field's rotation are not values of the entry",
+         "here": "Ga128 / Gb128 of dmg.golay_sequences, turned like the preamble (jcas60.trn_sensing)", "verdict": OPEN},
         {"row": "C", "item": "who transmits and who receives", "key": TYPES,
          "entry": f"bistatic: transmitter {_of_type('transmitter', 'bistatic')}, receiver {_of_type('receiver', 'bistatic')}",
          "here": "one device transmits, the other correlates", "verdict": FITS},
         {"row": "C", "item": "the PPDU", "key": TYPES,
          "entry": "the entries give a PPDU for the monostatic types and for the multistatic type, none for the bistatic type",
-         "here": "the same plain SC PPDU as row B, read on its L-CEF", "verdict": NO_ENTRY},
+         "here": "the same PPDUs as row B: the plain SC packet read on its L-CEF, or with the TRN field behind it", "verdict": NO_ENTRY},
         {"row": "B, C", "item": "packets of one frame, start to start", "key": SCHED,
          "entry": f"intraburst interval: {S.num(SCHED + '#octets@field=intraburst_interval').value:g} octet, in us: at most {lim['intraburst_interval']} us",
          "here": f"{intra_us:g} us", "verdict": FITS if intra_us <= lim["intraburst_interval"] else "does not fit"},
