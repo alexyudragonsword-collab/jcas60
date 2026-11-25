@@ -1,4 +1,4 @@
-# Vendored from spec_sources@0d17de6440344832737140ecfcdbf96b175a042a: src/spec_sources/reader.py
+# Vendored from spec_sources@3a6e1905ef7c48c01338cf9cd808e3fd4bdad8a7: src/spec_sources/reader.py
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 """Numbers about the outside world, with their provenance: the reader.
 

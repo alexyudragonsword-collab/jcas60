@@ -48,14 +48,14 @@ C  ay TRN field, bistatic                   radar limit 20.00 [derived/assumed] 
 == 3. the two roads (law 4): closed form against waveform simulation ==
 row                                               limit    closed, on the grid             simulation   difference   straddle                    read at   CA-CFAR  static path in the simulation
 A  FMCW (fmcw_radar default)                radar limit                      —                      —      +0.03 dB                                                  fmcw_radar's own two engines (time - statistical), from its example 00 as printed
-B  ay L-CEF, monostatic             communication limit               29.87 dB               29.82 dB      -0.05 dB    0.87 dB         5.006 m, +1.99 m/s  detected  leakage at -28.0 dBm
-B  ay L-CEF, monostatic                     radar limit               27.87 dB               27.81 dB      -0.06 dB    0.87 dB         5.006 m, +1.98 m/s  detected  leakage at -30.0 dBm
-C  ay L-CEF, bistatic               communication limit               29.37 dB               29.49 dB      +0.12 dB    1.37 dB         5.003 m, +2.00 m/s  detected  direct path at -50.1 dBm
-C  ay L-CEF, bistatic                       radar limit               27.37 dB               27.52 dB      +0.15 dB    1.37 dB         5.002 m, +2.01 m/s  detected  direct path at -52.1 dBm
-B  ay TRN field, monostatic         communication limit               42.88 dB               42.86 dB      -0.02 dB    0.87 dB         5.006 m, +2.00 m/s  detected  leakage at -28.0 dBm
-B  ay TRN field, monostatic                 radar limit               40.88 dB               40.85 dB      -0.03 dB    0.87 dB         5.006 m, +2.00 m/s  detected  leakage at -30.0 dBm
-C  ay TRN field, bistatic           communication limit               42.38 dB               42.33 dB      -0.05 dB    1.37 dB         5.005 m, +2.00 m/s  detected  direct path at -50.1 dBm
-C  ay TRN field, bistatic                   radar limit               40.38 dB               40.33 dB      -0.05 dB    1.37 dB         5.005 m, +2.00 m/s  detected  direct path at -52.1 dBm
+B  ay L-CEF, monostatic             communication limit               29.87 dB               29.96 dB      +0.09 dB    0.87 dB         5.005 m, +2.00 m/s  detected  leakage at -28.0 dBm
+B  ay L-CEF, monostatic                     radar limit               27.87 dB               27.97 dB      +0.10 dB    0.87 dB         5.005 m, +2.00 m/s  detected  leakage at -30.0 dBm
+C  ay L-CEF, bistatic               communication limit               29.37 dB               29.45 dB      +0.08 dB    1.37 dB         5.006 m, +2.00 m/s  detected  direct path at -50.1 dBm
+C  ay L-CEF, bistatic                       radar limit               27.37 dB               27.46 dB      +0.09 dB    1.37 dB         5.006 m, +2.00 m/s  detected  direct path at -52.1 dBm
+B  ay TRN field, monostatic         communication limit               42.88 dB               42.85 dB      -0.03 dB    0.87 dB         5.006 m, +2.00 m/s  detected  leakage at -28.0 dBm
+B  ay TRN field, monostatic                 radar limit               40.88 dB               40.84 dB      -0.04 dB    0.87 dB         5.006 m, +2.00 m/s  detected  leakage at -30.0 dBm
+C  ay TRN field, bistatic           communication limit               42.38 dB               42.37 dB      -0.01 dB    1.37 dB         5.005 m, +2.00 m/s  detected  direct path at -50.1 dBm
+C  ay TRN field, bistatic                   radar limit               40.38 dB               40.37 dB      -0.01 dB    1.37 dB         5.005 m, +2.00 m/s  detected  direct path at -52.1 dBm
   simulation: mean of 8 frames; the floor is read off the zero-Doppler ridge of the static path; the ADC and the LO phase noise are off here (section 5 turns them on)
 
 == 4. the limit each row is held to (law 3: each at its own; the ay rows under both readings of the rule) ==
@@ -79,57 +79,57 @@ B  ay L-CEF, monostatic            3520 [derived/assumed] MS/s    2 (I and Q)   
 C  ay L-CEF, bistatic              3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
   A: its leakage budget is not in its default report (the model is off in that config; its example 08 turns it on); an FMCW radar's leakage beats to near zero frequency and is filtered ahead of the ADC
   B, communication limit (conducted 12 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
-      in-band compression    43.3 dB [derived/assumed]  (closed form; simulated 43.3 dB: the leakage at -31.3 dBm, +2.7 dB from the in-band P1dB; 46.0 dB puts it at P1dB itself)
+      in-band compression    43.4 dB [derived/assumed]  (closed form; simulated 43.5 dB: the leakage at -31.4 dBm, +2.6 dB from the in-band P1dB; 46.0 dB puts it at P1dB itself)
       ADC quantisation       39.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
       LO phase noise         43.0 dB [derived/assumed]  (shared LO, leakage delayed 0.1 ns: residual -44.4 dBc after range correlation)
-      -> 43.3 dB, set by the in-band compression
-      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target (-29.9 dBc) the isolation is 50.9 dB by the closed form (an upper bound on the image) / 48.8 dB simulated
-      have 20 [derived] dB, antenna arrays without EBG (low end): short by 23.3 dB; leakage -8 dBm; ENOB needed 12.39
-          both roads, floor rise: ADC closed 14.18 dB / simulated 9.24 dB; LO phase noise closed 17.20 dB / simulated 17.29 dB
-          the ADC's error: thermal noise is 0.06 LSB rms, 69 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 9.25 dB, the rest is the zero-Doppler ridge
-          compression (limiter, p = 2): SNR closed -3.19 dB / simulated -3.48 dB (the echo itself -30.42 / -30.59 dB); image at the mirrored Doppler -10.2 dBc (closed-form bound -0.0 dBc); the target's range sidelobes -26.5 dBc; ridge -104.3 dBm
-          simulation, linear receiver and ideal ADC: SNR 29.82 dB with the leakage, 29.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.1 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -1.00 dB
-      have 40 [spec] dB, antenna arrays with EBG: short by 3.3 dB; leakage -28 dBm; ENOB needed 9.07
-          both roads, floor rise: ADC closed 0.97 dB / simulated 0.98 dB; LO phase noise closed 1.80 dB / simulated 1.85 dB
+      -> 43.4 dB, set by the in-band compression
+      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target (-29.9 dBc) the isolation is 50.9 dB by the closed form (an upper bound on the image) / 48.7 dB simulated
+      have 20 [derived] dB, antenna arrays without EBG (low end): short by 23.4 dB; leakage -8 dBm; ENOB needed 12.39
+          both roads, floor rise: ADC closed 14.18 dB / simulated 10.55 dB; LO phase noise closed 17.20 dB / simulated 17.26 dB
+          the ADC's error: thermal noise is 0.06 LSB rms, 65 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 10.27 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -3.21 dB / simulated -3.63 dB (the echo itself -30.41 / -30.69 dB); image at the mirrored Doppler -10.2 dBc (closed-form bound -0.0 dBc); the target's range sidelobes -18.9 dBc; ridge -123.5 dBm
+          simulation, linear receiver and ideal ADC: SNR 29.96 dB with the leakage, 29.96 dB without; with the ADC the zero-Doppler ridge at the target's range is -97.5 dBm (target -86.0 dBm, floor -116.0 dBm) and the target's peak moves +1.43 dB
+      have 40 [spec] dB, antenna arrays with EBG: short by 3.4 dB; leakage -28 dBm; ENOB needed 9.07
+          both roads, floor rise: ADC closed 0.97 dB / simulated 0.95 dB; LO phase noise closed 1.80 dB / simulated 1.86 dB
           the ADC's error: thermal noise is 0.58 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.96 dB, the rest is the zero-Doppler ridge
-          compression (limiter, p = 2): SNR closed -2.11 dB / simulated -2.16 dB (the echo itself -9.59 / -9.94 dB); image at the mirrored Doppler -11.4 dBc (closed-form bound -2.6 dBc); the target's range sidelobes -33.0 dBc; ridge -103.7 dBm
-          simulation, linear receiver and ideal ADC: SNR 29.82 dB with the leakage, 29.78 dB without; with the ADC the zero-Doppler ridge at the target's range is -114.6 dBm (target -86.1 dBm, floor -116.0 dBm) and the target's peak moves -0.06 dB
+          compression (limiter, p = 2): SNR closed -2.12 dB / simulated -2.26 dB (the echo itself -9.58 / -9.99 dB); image at the mirrored Doppler -11.8 dBc (closed-form bound -2.6 dBc); the target's range sidelobes -29.3 dBc; ridge -121.0 dBm
+          simulation, linear receiver and ideal ADC: SNR 29.96 dB with the leakage, 29.96 dB without; with the ADC the zero-Doppler ridge at the target's range is -117.5 dBm (target -86.0 dBm, floor -116.0 dBm) and the target's peak moves +0.00 dB
   B, radar limit (conducted 10 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
-      in-band compression    41.3 dB [derived/assumed]  (closed form; simulated 41.3 dB: the leakage at -31.3 dBm, +2.7 dB from the in-band P1dB; 44.0 dB puts it at P1dB itself)
+      in-band compression    41.4 dB [derived/assumed]  (closed form; simulated 41.5 dB: the leakage at -31.4 dBm, +2.6 dB from the in-band P1dB; 44.0 dB puts it at P1dB itself)
       ADC quantisation       37.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
       LO phase noise         41.0 dB [derived/assumed]  (shared LO, leakage delayed 0.1 ns: residual -44.4 dBc after range correlation)
-      -> 41.3 dB, set by the in-band compression
-      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target (-27.9 dBc) the isolation is 48.4 dB by the closed form (an upper bound on the image) / 46.3 dB simulated
-      have 20 [derived] dB, antenna arrays without EBG (low end): short by 21.3 dB; leakage -10 dBm; ENOB needed 12.06
-          both roads, floor rise: ADC closed 12.27 dB / simulated 8.39 dB; LO phase noise closed 15.25 dB / simulated 15.34 dB
-          the ADC's error: thermal noise is 0.07 LSB rms, 61 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 8.40 dB, the rest is the zero-Doppler ridge
-          compression (limiter, p = 2): SNR closed -3.19 dB / simulated -3.31 dB (the echo itself -28.42 / -28.57 dB); image at the mirrored Doppler -10.2 dBc (closed-form bound -0.0 dBc); the target's range sidelobes -27.7 dBc; ridge -104.3 dBm
-          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.77 dB without; with the ADC the zero-Doppler ridge at the target's range is -87.9 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.65 dB
-      have 40 [spec] dB, antenna arrays with EBG: short by 1.3 dB; leakage -30 dBm; ENOB needed 8.74
-          both roads, floor rise: ADC closed 0.64 dB / simulated 0.67 dB; LO phase noise closed 1.22 dB / simulated 1.26 dB
-          the ADC's error: thermal noise is 0.72 LSB rms, 2 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.63 dB, the rest is the zero-Doppler ridge
-          compression (limiter, p = 2): SNR closed -1.45 dB / simulated -1.45 dB (the echo itself -7.09 / -7.37 dB); image at the mirrored Doppler -13.0 dBc (closed-form bound -4.9 dBc); the target's range sidelobes -32.5 dBc; ridge -103.8 dBm
-          simulation, linear receiver and ideal ADC: SNR 27.81 dB with the leakage, 27.77 dB without; with the ADC the zero-Doppler ridge at the target's range is -115.0 dBm (target -88.2 dBm, floor -116.0 dBm) and the target's peak moves -0.04 dB
-  B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), communication limit: 30 dB gain: NF 15.6 dB, P1dB -24 dBm, needs 33.3 dB; 36 dB gain: NF 12.2 dB, P1dB -30 dBm, needs 39.3 dB; 40 dB gain: NF 11 dB, P1dB -34 dBm, needs 43.3 dB; 44 dB gain: NF 10.5 dB, P1dB -38 dBm, needs 47.3 dB; 48 dB gain: NF 10.3 dB, P1dB -42 dBm, needs 51.3 dB
-  B, the limiter against the leakage's level (in-band P1dB -34 dBm, p = 2 [assumed]; the echo's SNR never loses more than 3.19 dB: the limiter takes the noise down with it):
+      -> 41.4 dB, set by the in-band compression
+      besides sensitivity, the compression mirrors the target to minus its Doppler: for that image to stay under the map's floor for this target (-27.9 dBc) the isolation is 48.3 dB by the closed form (an upper bound on the image) / 46.1 dB simulated
+      have 20 [derived] dB, antenna arrays without EBG (low end): short by 21.4 dB; leakage -10 dBm; ENOB needed 12.06
+          both roads, floor rise: ADC closed 12.27 dB / simulated 9.52 dB; LO phase noise closed 15.25 dB / simulated 15.31 dB
+          the ADC's error: thermal noise is 0.07 LSB rms, 57 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 9.23 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -3.20 dB / simulated -3.49 dB (the echo itself -28.41 / -28.69 dB); image at the mirrored Doppler -10.2 dBc (closed-form bound -0.0 dBc); the target's range sidelobes -21.0 dBc; ridge -123.4 dBm
+          simulation, linear receiver and ideal ADC: SNR 27.97 dB with the leakage, 27.97 dB without; with the ADC the zero-Doppler ridge at the target's range is -97.9 dBm (target -88.0 dBm, floor -116.0 dBm) and the target's peak moves +1.37 dB
+      have 40 [spec] dB, antenna arrays with EBG: short by 1.4 dB; leakage -30 dBm; ENOB needed 8.74
+          both roads, floor rise: ADC closed 0.64 dB / simulated 0.64 dB; LO phase noise closed 1.22 dB / simulated 1.28 dB
+          the ADC's error: thermal noise is 0.72 LSB rms, 1 % of the error is the same in every packet (the closed form takes all of it for noise); the part that is not gives a floor rise of 0.63 dB, the rest is the zero-Doppler ridge
+          compression (limiter, p = 2): SNR closed -1.47 dB / simulated -1.55 dB (the echo itself -7.10 / -7.43 dB); image at the mirrored Doppler -13.5 dBc (closed-form bound -4.9 dBc); the target's range sidelobes -28.6 dBc; ridge -120.8 dBm
+          simulation, linear receiver and ideal ADC: SNR 27.97 dB with the leakage, 27.97 dB without; with the ADC the zero-Doppler ridge at the target's range is -117.7 dBm (target -88.0 dBm, floor -116.0 dBm) and the target's peak moves +0.04 dB
+  B, compression at each gain setting of the receiver (rx60.radar_iwr6843_fig7_2), communication limit: 30 dB gain: NF 15.6 dB, P1dB -24 dBm, needs 33.4 dB; 36 dB gain: NF 12.2 dB, P1dB -30 dBm, needs 39.4 dB; 40 dB gain: NF 11 dB, P1dB -34 dBm, needs 43.4 dB; 44 dB gain: NF 10.5 dB, P1dB -38 dBm, needs 47.4 dB; 48 dB gain: NF 10.3 dB, P1dB -42 dBm, needs 51.4 dB
+  B, the limiter against the leakage's level (in-band P1dB -34 dBm, p = 2 [assumed]; the echo's SNR never loses more than 3.21 dB: the limiter takes the noise down with it):
        leakage [dBm]   SNR closed  SNR simulated  echo closed  echo simulated  image bound [dBc]  image simulated  range sidelobes
-                 -46        -0.00          -0.00        -0.02           -0.02              -57.9            -66.5            -53.7
-                 -44        -0.00          -0.00        -0.04           -0.04              -49.9            -57.9            -53.0
-                 -42        -0.00          -0.00        -0.10           -0.10              -42.0            -49.6            -51.4
-                 -40        -0.00          -0.00        -0.25           -0.25              -34.1            -41.7            -48.6
-                 -38        -0.02          -0.02        -0.61           -0.59              -26.6            -34.0            -44.4
-                 -36        -0.08          -0.07        -1.35           -1.34              -19.5            -26.9            -39.7
-                 -34        -0.31          -0.27        -2.70           -2.73              -13.4            -20.7            -35.7
-                 -32        -0.79          -0.75        -4.69           -4.85               -8.5            -16.0            -33.2
-                 -30        -1.45          -1.47        -7.09           -7.39               -4.9            -13.0            -32.5
-                 -28        -2.11          -2.16        -9.59           -9.94               -2.6            -11.4            -33.0
-                 -26        -2.62          -2.62       -11.99          -12.29               -1.2            -10.7            -33.7
-                 -24        -2.93          -2.86       -14.22          -14.46               -0.5            -10.4            -34.2
-                 -22        -3.08          -2.98       -16.34          -16.53               -0.2            -10.3            -34.5
+                 -46        -0.00          -0.00        -0.02           -0.02              -57.9            -67.3            -53.8
+                 -44        -0.00          -0.00        -0.04           -0.04              -49.9            -58.6            -53.1
+                 -42        -0.00          -0.00        -0.10           -0.10              -42.0            -50.3            -51.8
+                 -40        -0.00          -0.01        -0.25           -0.25              -34.2            -42.3            -49.2
+                 -38        -0.02          -0.02        -0.60           -0.60              -26.6            -34.6            -44.0
+                 -36        -0.08          -0.09        -1.35           -1.36              -19.5            -27.5            -37.2
+                 -34        -0.30          -0.31        -2.71           -2.76              -13.3            -21.4            -32.1
+                 -32        -0.79          -0.81        -4.71           -4.88               -8.4            -16.7            -29.2
+                 -30        -1.47          -1.55        -7.10           -7.43               -4.9            -13.5            -28.6
+                 -28        -2.12          -2.26        -9.58           -9.99               -2.6            -11.8            -29.3
+                 -26        -2.62          -2.75       -11.98          -12.36               -1.3            -10.9            -30.1
+                 -24        -2.93          -3.01       -14.21          -14.55               -0.6            -10.5            -30.7
+                 -22        -3.09          -3.13       -16.33          -16.63               -0.2            -10.4            -30.9
       with another knee the 1 dB criterion moves (communication limit): p = 1: 37.1 dB; p = 3: 45.1 dB
   the TRN rows pay the same three: the leakage (or the direct path) is at the same level whatever field is sensed on; the receiver is on for 17.5 us of TRN field a packet instead of 0.73 us of L-CEF
-  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.89 dB (SNR -0.98 dB); compression at that level (closed form): SNR -0.000 dB, image bound -74.4 dBc
-  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.60 dB (SNR -0.71 dB); compression at that level (closed form): SNR -0.000 dB, image bound -82.4 dBc
+  C, communication limit: direct path -50.1 dBm [derived/assumed], 16.1 dB under the in-band P1dB; ENOB needed 5.40; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 1.26 dB / simulated 0.92 dB (SNR -1.06 dB); compression at that level (closed form): SNR -0.000 dB, image bound -74.4 dBc
+  C, radar limit: direct path -52.1 dBm [derived/assumed], 18.1 dB under the in-band P1dB; ENOB needed 5.06; independent LOs after referencing to the direct path: residual -24.1 dBc, floor rise closed 0.84 dB / simulated 0.61 dB (SNR -0.78 dB); compression at that level (closed form): SNR -0.000 dB, image bound -82.4 dBc
      C pays elsewhere: the two devices share no clock, so every packet's phase is taken from the direct path (simulated) and its timing and carrier offset from the preamble (not simulated)
 
 == 6. air time: 30 sensing frames a second, against a link at 4620 [derived/assumed] Mb/s (mmw60_trx's comparison table, ay_sc on channel 2) ==
@@ -149,18 +149,18 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
 == 7. a Golay pair's sidelobes when the target moves (waveform simulation: one packet, no noise, target on a chip) ==
    radial velocity [m/s]     peak sidelobe in the zero zone [dBc]    peak [dB]     carrier turn over one sequence [rad]
                      0.0                                   -240.8       0.0011                                 0.00e+00
-                     2.0                                    -87.9       0.0011                                 1.47e-03
-                    12.4                                    -72.1       0.0010                                 9.14e-03
-                    50.0                                    -60.0      -0.0009                                 3.69e-02
-                   200.0                                    -47.9      -0.0304                                 1.47e-01
+                     2.0                                    -89.6       0.0011                                 1.47e-03
+                    12.4                                    -73.7       0.0010                                 9.14e-03
+                    50.0                                    -61.6      -0.0009                                 3.69e-02
+                   200.0                                    -49.6      -0.0304                                 1.47e-01
   0 m/s: the pair cancels exactly; what the arithmetic leaves is rounding and is printed as its bound (one unit in the last place on every sample of the buffer: -240.8 dBc, -216.7 dBc for the TRN field's); 12.4 m/s is the unambiguous velocity of section 1
-  the TRN field, blocks 2-5 of every subfield correlated (all six blocks at rest: -30.1 dBc):
+  the TRN field, blocks 2-5 of every subfield correlated (all six blocks at rest: -36.4 dBc):
    radial velocity [m/s]     peak sidelobe in the zero zone [dBc]    peak [dB]    carrier turn over the TRN field [rad]
                      0.0                                   -216.7       0.0000                                 0.00e+00
-                     2.0                                    -83.4      -0.0028                                 8.85e-02
-                    12.4                                    -67.5      -0.1092                                 5.49e-01
-                    50.0                                    -55.4      -1.8494                                 2.21e+00
-                   200.0                                    -43.4     -13.2721                                 8.85e+00
+                     2.0                                    -84.4      -0.0028                                 8.85e-02
+                    12.4                                    -68.5      -0.1091                                 5.49e-01
+                    50.0                                    -56.4      -1.8494                                 2.21e+00
+                   200.0                                    -44.4     -13.2721                                 8.85e+00
   the peak column is the coherent loss inside one packet: the TRN field is long enough for a fast target to turn the carrier across it
 
 == 8. sensitivity: row B under the communication limit, closed form, one choice changed at a time ==

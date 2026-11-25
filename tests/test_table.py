@@ -90,7 +90,7 @@ def test_the_numbers_the_conclusions_quote(t):
            "comp 40": t["monostatic"][0]["checks"][1]["comp_snr_closed_db"], "image 40": t["monostatic"][0]["checks"][1]["comp_image_sim_dbc"], "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
            "need pn": t["monostatic"][0]["cost"].need_pn_db.value, "air": rows[1]["air_fraction"].value * 100, "air A": rows[0]["air_fraction"].value * 100}
     want = {"A snr": 43.34, "B comm snr": 30.74, "B radar snr": 28.74, "B comm range": 14.28, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
-            "B width cm": 7.43, "B clean": 10.90, "need": 43.3, "ghost": 48.8, "B trn snr": 43.75, "B trn radar snr": 41.75, "air trn": 4.51, "comp 40": -2.11, "image 40": -11.4, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
+            "B width cm": 7.43, "B clean": 10.90, "need": 43.4, "ghost": 48.7, "B trn snr": 43.75, "B trn radar snr": 41.75, "air trn": 4.51, "comp 40": -2.12, "image 40": -11.8, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
     for k, v in want.items():
         assert got[k] == pytest.approx(v, abs=0.006 if (abs(v) < 20 and k not in ("ghost", "image 40")) or "snr" in k or "range" in k else 0.06), k
     assert regulatory.comm_rate_mbps().value == 4620.0
@@ -143,7 +143,7 @@ def test_the_trn_field_is_built_from_the_entry_and_is_clean_on_blocks_2_to_5(t):
     for d in (0, 1, 57, 127, -1, -100):
         got = sum(np.vdot(ref, f.chips[w0 + n * 6 - d: w0 + n * 6 - d + len(ref)]) for w0, ref in f.windows[:-1])
         assert abs(got) < 1e-9 if d else abs(got - (len(f.windows) - 1) * 4 * n) < 1e-9
-    assert t["golay_trn"][0][1] == t["rounding_dbc"]["trn"] < -200 and -32 < t["golay_trn_all_blocks"] < -28   # all six blocks leave sidelobes
+    assert t["golay_trn"][0][1] == t["rounding_dbc"]["trn"] < -200 and -38 < t["golay_trn_all_blocks"] < -34   # all six blocks leave sidelobes
     assert t["golay_trn"][1][0] == 2.0 and t["golay_trn"][1][1] < -80 and t["golay_trn"][1][2] > -0.01
     # the number of units is the fewest that reach row A under the communication limit
     a = t["rows"][0]["snr_db"].value

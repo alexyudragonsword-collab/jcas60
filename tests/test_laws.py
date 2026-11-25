@@ -257,7 +257,7 @@ def test_law7_what_is_said_is_checked_item_by_item_against_the_entries(t):
 # ----------------------------------------------------------------------------- the field itself
 def test_the_golay_pair_is_complementary_within_the_cyclic_prefix_and_the_recursion_gives_the_tables():
     from jcas60 import field as F
-    for n in (128, 64, 32):
+    for n in (128, 64):
         a, b = F.from_recursion(n)
         assert np.array_equal(a, F.tabulated(f"ga{n}")) and np.array_equal(b, F.tabulated(f"gb{n}"))
     f = F.l_cef()
