@@ -286,7 +286,9 @@ def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
 def golay_under_doppler(s: Setup, bench: _Bench, velocities, sim=None, span_chips: int | None = None) -> list:
     """Peak sidelobe of the summed correlations at the chip-spaced lags of the zero-sidelobe zone, one packet, no
     noise, the target on a chip: what the pair's complementarity is worth when the target moves.  The last column
-    is the carrier's turn over ``span_chips`` (default: one correlation window of the simulator's field)."""
+    is the carrier's turn over ``span_chips`` (default: one correlation window of the simulator's field).  A level
+    under the arithmetic's rounding (``Simulator.rounding_dbc``) is reported as that bound: at rest the pair cancels
+    exactly and what is left is not a reading."""
     sim, out = sim or bench.sim, []
     span = len(sim.field.windows[0][1]) if span_chips is None else span_chips
     delay_chips = round(B.geometry(s, "monostatic").delay_s * s.chip_rate_hz.value)
@@ -298,7 +300,7 @@ def golay_under_doppler(s: Setup, bench: _Bench, velocities, sim=None, span_chip
         zone = (lags >= 0) & (lags <= sim.field.zero_sidelobe_chips) & (lags != delay_chips)
         peak = float(chip[lags == delay_chips][0])
         turn = 2.0 * math.pi * (2.0 * v / s.wavelength_m) * span / s.chip_rate_hz.value
-        out.append((float(v), db(float(chip[zone].max()) / peak + 1e-40), db(peak), turn))
+        out.append((float(v), max(db(float(chip[zone].max()) / peak + 1e-40), sim.rounding_dbc), db(peak), turn))
     return out
 
 
@@ -392,6 +394,7 @@ def build() -> dict:
         "bistatic": [bistatic_block(s, bench, r) for r in (comm, radar)],
         "golay": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0)),
         "golay_trn": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0), bench.sim_trn, s.trn_field.chips.size),
+        "rounding_dbc": {"l_cef": bench.sim.rounding_dbc, "trn": bench.sim_trn.rounding_dbc},
         "golay_trn_all_blocks": golay_under_doppler(s, bench, (0.0,), W.Simulator(s, _all_blocks(s)))[0][1],
         "trn_sweep": trn_sweep(s, comm, a["snr_db"].value),
         "pulse_sidelobes": pulse_sidelobes(s, bench), "width_measured_chips": measured_width_chips(s, bench),
@@ -569,7 +572,9 @@ def render(t: dict | None = None) -> str:
     w(f"{'radial velocity [m/s]':>24s} {'peak sidelobe in the zero zone [dBc]':>40s} {'peak [dB]':>12s} {'carrier turn over one sequence [rad]':>40s}")
     for v, side, peak, turn in t["golay"]:
         w(f"{v:24.1f} {side:40.1f} {peak:12.4f} {turn:40.2e}")
-    w(f"  0 m/s is the pair's exact cancellation at double precision; {t['golay'][2][0]:g} m/s is the unambiguous velocity of section 1")
+    w(f"  0 m/s: the pair cancels exactly; what the arithmetic leaves is rounding and is printed as its bound (one unit in the last place on every "
+      f"sample of the buffer: {t['rounding_dbc']['l_cef']:.1f} dBc, {t['rounding_dbc']['trn']:.1f} dBc for the TRN field's); "
+      f"{t['golay'][2][0]:g} m/s is the unambiguous velocity of section 1")
     w(f"  the TRN field, blocks {'-'.join(str(b) for b in (S.raw('jcas60.trn_sensing#correlated_blocks')[0], S.raw('jcas60.trn_sensing#correlated_blocks')[-1]))} of every subfield correlated "
       f"(all six blocks at rest: {t['golay_trn_all_blocks']:.1f} dBc):")
     w(f"{'radial velocity [m/s]':>24s} {'peak sidelobe in the zero zone [dBc]':>40s} {'peak [dB]':>12s} {'carrier turn over the TRN field [rad]':>40s}")

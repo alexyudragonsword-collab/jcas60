@@ -99,7 +99,8 @@ def test_the_numbers_the_conclusions_quote(t):
 
 def test_golay_sidelobes_rise_with_velocity_from_exact_cancellation(t):
     g = t["golay"]
-    assert g[0][0] == 0.0 and g[0][1] < -250.0                     # the pair's cancellation at double precision
+    # at rest the pair cancels exactly: what is left is under the arithmetic's rounding, and is reported as that bound
+    assert g[0][0] == 0.0 and g[0][1] == t["rounding_dbc"]["l_cef"] < -200.0 and g[1][1] > g[0][1] + 100.0
     assert g[1][0] == 2.0 and -90.0 < g[1][1] < -85.0
     levels = [x[1] for x in g]
     assert levels == sorted(levels)
@@ -142,7 +143,7 @@ def test_the_trn_field_is_built_from_the_entry_and_is_clean_on_blocks_2_to_5(t):
     for d in (0, 1, 57, 127, -1, -100):
         got = sum(np.vdot(ref, f.chips[w0 + n * 6 - d: w0 + n * 6 - d + len(ref)]) for w0, ref in f.windows[:-1])
         assert abs(got) < 1e-9 if d else abs(got - (len(f.windows) - 1) * 4 * n) < 1e-9
-    assert t["golay_trn"][0][1] < -250 and -32 < t["golay_trn_all_blocks"] < -28          # all six blocks leave sidelobes
+    assert t["golay_trn"][0][1] == t["rounding_dbc"]["trn"] < -200 and -32 < t["golay_trn_all_blocks"] < -28   # all six blocks leave sidelobes
     assert t["golay_trn"][1][0] == 2.0 and t["golay_trn"][1][1] < -80 and t["golay_trn"][1][2] > -0.01
     # the number of units is the fewest that reach row A under the communication limit
     a = t["rows"][0]["snr_db"].value

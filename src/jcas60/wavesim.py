@@ -40,7 +40,7 @@ import numpy as np
 
 from .budget import Geometry, rc_spectrum
 from .config import Setup
-from .physconst import C0, undb
+from .physconst import C0, db, undb
 from .vendor.fmcw_radar.link.compression import rapp as _rapp
 from .vendor.fmcw_radar.processing import cfar as _cfar
 from .vendor.fmcw_radar.processing import rd as _rd
@@ -139,6 +139,14 @@ class Simulator:
         def q(v):
             return np.clip((np.floor(v / step) + 0.5) * step, -full_scale + step / 2, full_scale - step / 2)
         return q(x.real) + 1j * q(x.imag)
+
+    @property
+    def rounding_dbc(self) -> float:
+        """Relative to a peak, the level under which a result is the arithmetic's own rounding and not a reading:
+        every sample of the buffer the transforms run on off by one unit in the last place, all of them the same
+        way.  What is left of an exact cancellation sits far under it and differs between FFT implementations, so
+        it is reported as this bound."""
+        return 2.0 * db(float(np.finfo(float).eps) * self.n)
 
     def unit_envelope(self) -> np.ndarray:
         """The transmitted field's envelope at unit mean power, one value per sample of the field: what a strong

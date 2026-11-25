@@ -88,6 +88,7 @@ def record() -> dict:
     _flat("table.bistatic", t["bistatic"], out)
     _flat("table.golay", t["golay"], out)
     _flat("table.golay_trn", {"blocks_2_to_5": t["golay_trn"], "all_blocks_at_rest": t["golay_trn_all_blocks"]}, out)
+    _flat("table.rounding_dbc", t["rounding_dbc"], out)
     _flat("table.trn_sweep", t["trn_sweep"], out)
     _flat("field.trn_chips", np.asarray(s.trn_field.chips), out)
     _flat("table.pulse_sidelobes", t["pulse_sidelobes"], out)
