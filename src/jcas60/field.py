@@ -76,3 +76,47 @@ def l_cef() -> Field:
     chips.setflags(write=False)
     wins = tuple((seg + k * len(gu), chips[seg + k * len(gu): seg + (k + 1) * len(gu)]) for k in range(2))
     return Field(chips=chips, n0=seg, windows=wins, zero_sidelobe_chips=seg)
+
+
+def trn_r_subfields_per_unit() -> int:
+    """How many subfields one unit of a TRN-R packet's field has, from the entry's text (``L_T = 0, L_P = 0, L_M = <n>``)."""
+    import re
+    text = str(S.raw("edmg.trn_field#trn_r_packet"))
+    got = dict((k, int(v)) for k, v in re.findall(r"(L_[TPM]) = (\d+)", text))
+    if set(got) != {"L_T", "L_P", "L_M"} or got["L_T"] or got["L_P"]:
+        raise ValueError(f"edmg.trn_field#trn_r_packet is not 'L_T = 0, L_P = 0, L_M = <n>': {text!r}")
+    return got["L_M"]
+
+
+@lru_cache(maxsize=4)
+def trn(units: int, blocks: tuple) -> Field:
+    """The TRN field of an EDMG TRN-R packet, ``units`` units long, with the correlation windows on the ``blocks``
+    (1-based) of every subfield.
+
+    The basic subfield is six Golay blocks, [Ga, -Gb, Ga, Gb, Ga, -Gb] (``edmg.trn_field``).  For a path delayed
+    by up to one block, a block's window holds the tail of the block before it; correlating blocks 2-5 with their
+    own signs, the two Ga and the two Gb give R_a + R_b = 0 off the peak and the four neighbour terms come out
+    -C_ab - C_ba + C_ab + C_ba = 0: no sidelobe within a block either way, blocks 1 and 6 standing guard.  With
+    all six the neighbour terms leave -(C_ab + C_ba).  Built by mmw60_trx's ``compose`` and ``rotate`` (vendored)
+    from the entry's block list."""
+    n = int(S.num("edmg.trn_field#trn_bl@trn_seq_length=normal").value)
+    ga, gb = tabulated(f"ga{n}"), tabulated(f"gb{n}")
+    items = list(S.raw("edmg.trn_field#basic_subfield"))
+    sub = P.compose({"Ga_N": ga, "Gb_N": gb}, items)
+    count = int(units) * trn_r_subfields_per_unit()
+    chips = P.rotate(np.tile(sub, count))                       # n = 0 at the field's first chip: the packet before it is a multiple of four chips
+    chips.setflags(write=False)
+    runs, start = [], None                                      # consecutive blocks become one window
+    for b in sorted(int(x) for x in blocks) + [None]:
+        if start is None:
+            start = prev = b
+        elif b is not None and b == prev + 1:
+            prev = b
+        else:
+            runs.append((start, prev))
+            start = prev = b
+    wins = tuple((k * sub.size + (b0 - 1) * n, chips[k * sub.size + (b0 - 1) * n: k * sub.size + b1 * n])
+                 for k in range(count) for b0, b1 in runs)
+    if not all(1 <= b <= len(items) for b in blocks):
+        raise ValueError(f"blocks must be 1 .. {len(items)}")
+    return Field(chips=chips, n0=0, windows=wins, zero_sidelobe_chips=n)

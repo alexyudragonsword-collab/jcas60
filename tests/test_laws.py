@@ -139,7 +139,8 @@ def test_law2_the_lo_is_named_as_the_one_number_not_shared(t):
 # ----------------------------------------------------------------------------- law 3: each row at its own limit, both in the table
 def test_law3_every_row_states_its_rule_and_limit_and_both_readings_are_rows(t):
     rows = t["rows"]
-    assert [r["limit"] for r in rows] == ["radar limit", "communication limit", "radar limit", "communication limit", "radar limit"]
+    assert [r["limit"] for r in rows] == ["radar limit"] + ["communication limit", "radar limit"] * 4
+    assert [r.get("field") for r in rows] == [None] + ["L-CEF"] * 4 + ["TRN field"] * 4
     for r in rows:
         assert r["cap_dbm"].tag == "spec" and r["rule"].startswith("47 CFR 15.255")
         assert r["eirp_dbm"].value <= r["cap_dbm"].value + 1e-12            # never above its own limit
@@ -199,13 +200,22 @@ def test_law4_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_
                 assert ck["repeating_share"] > 0.5 and ck["adc_rise_sim_db"] < ck["adc_rise_closed_db"] - 1.0
             assert abs(ck["adc_rise_sim_db"] - ck["adc_rise_varying_db"]) < 0.2    # the part that is not the same in every packet is the floor
             assert abs(ck["snr_linear_db"] - blk["snr_no_leak_db"]) < 0.2          # a linear receiver does not lose sensitivity to the leakage
+            # the receiver's compression: the small-signal closed form and the limiter in the simulation
+            assert abs(ck["comp_snr_sim_db"] - ck["comp_snr_closed_db"]) < 0.4 and abs(ck["comp_signal_sim_db"] - ck["comp_signal_closed_db"]) < 0.5
+            assert ck["comp_image_sim_dbc"] < ck["comp_image_closed_dbc"]             # the closed form's image is an upper bound
+        assert abs(blk["need_compression_sim_db"] - blk["cost"].need_compression_db.value) < 0.3
+        assert blk["ghost"]["need_sim_db"] < blk["ghost"]["need_closed_db"] < blk["ghost"]["need_sim_db"] + 4.0
+    sweep = t["compression"]
+    for r in sweep["rows"]:
+        assert abs(r["snr_sim_db"] - r["snr_closed_db"]) < 0.25 and r["image_sim_dbc"] < r["image_closed_dbc"], r["level_dbm"]
+    assert 3.0 < -sweep["snr_limit_closed_db"] < 3.3                                   # a limiter never costs the echo much more than 3 dB of SNR
     for blk in t["bistatic"]:
         assert abs(blk["pn_rise_sim_db"] - blk["pn_rise_closed_db"]) < 1.0
 
 
 # ----------------------------------------------------------------------------- law 7: wording
 BF_KEYS = ("ieee80211bf.dmg_sensing_types", "ieee80211bf.dmg_sensing_scheduling", "ieee80211bf.dmg_monostatic_ppdu",
-           "ieee80211bf.dmg_sensing_bandwidth", "ieee80211bf.edmg_multistatic_ppdu")
+           "ieee80211bf.dmg_sensing_bandwidth", "ieee80211bf.edmg_multistatic_ppdu", "edmg.trn_field")
 
 
 def test_law7_no_conformance_claim_anywhere():
@@ -227,7 +237,7 @@ def test_law7_what_is_said_is_checked_item_by_item_against_the_entries(t):
     """Section 11: every item names its entry, and a 'fits' is computed from the entry, not written down."""
     from jcas60 import bf
     checks = t["bf"]
-    assert len(checks) == 10 and all(c["key"] in BF_KEYS for c in checks)
+    assert len(checks) == 13 and all(c["key"] in BF_KEYS for c in checks)
     assert {c["verdict"] for c in checks} == {bf.FITS, bf.OPEN, bf.NO_ENTRY}
     by = {(c["row"], c["item"]): c for c in checks}
     assert by[("C", "the PPDU")]["verdict"] == bf.NO_ENTRY                       # the bistatic row's packet has no entry behind it

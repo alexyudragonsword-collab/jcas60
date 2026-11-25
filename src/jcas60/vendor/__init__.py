@@ -47,6 +47,9 @@ Pins
     fmcw_radar is imported when it loads; this library calls its
     ``check_emission`` with ``jcas60.sources.fcc_number`` as the function
     that looks a limit up, and never its ``check(cfg)``),
+  - ``link/compression.py`` (verbatim; numpy only: the Rapp limiter the
+    simulation puts in the receiver and the small-signal theory the closed
+    form uses for the same thing),
   - ``examples/expected/00_single_target_rd_map.txt`` (its example 00 as
     printed: the two engines' difference is read from it).
 

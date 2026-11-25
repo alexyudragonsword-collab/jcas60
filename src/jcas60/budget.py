@@ -13,10 +13,11 @@ and what a sampled map shows is that less the straddling of the lag grid and
 of the Doppler bins (``on_grid``: the window-weighted coherent sum of the
 raised-cosine pulse over the packets, the target's range walk included).
 
-Also here, closed form only: what a monostatic receiver needs for the
-transmit leakage not to cost sensitivity -- the in-band compression point,
-the ADC's quantisation noise, and the LO phase noise the leakage carries
-after range correlation -- each against the thermal floor.
+Also here: what a monostatic receiver needs for the transmit leakage not
+to cost sensitivity -- its in-band compression (fmcw_radar's small-signal
+theory of a limiter, on the leakage's envelope), the ADC's quantisation
+noise, and the LO phase noise the leakage carries after range correlation
+-- each against the same allowed desensitisation.
 """
 from __future__ import annotations
 
@@ -28,6 +29,7 @@ import numpy as np
 from .config import Setup
 from .physconst import C0, db, undb
 from .sources import Num, derive
+from .vendor.fmcw_radar.link.compression import small_signal
 from .vendor.fmcw_radar.processing.detection import pd_swerling0, snr_for_pd
 from .vendor.fmcw_radar.processing.windows import enbw_bins, window
 
@@ -149,8 +151,9 @@ def on_grid(s: Setup, g: Geometry, lags_per_chip: int) -> tuple[float, int, int]
     return best
 
 
-def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None) -> Link:
+def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None, field=None) -> Link:
     g = geometry(s, kind, range_m)
+    field = s.field if field is None else field
     fe = s.fe
     spread = derive(spreading_loss_db(s.wavelength_m, g), "(4 pi)^3 R_t^2 R_r^2 / lambda^2", s.carrier_hz, s.range_m, unit="dB")
     oxy = derive(s.oxygen_db_per_km.value * g.path_m / 1e3, "gamma_o (R_t + R_r)", s.oxygen_db_per_km, s.range_m, unit="dB")
@@ -159,7 +162,8 @@ def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None) -> Link:
     n0 = fe.noise_density_dbm_hz
     noise = derive(n0.value + db(s.chip_rate_hz.value), "k T0 F Rc", n0, s.chip_rate_hz, unit="dBm")
     snr_chip = derive(p_rx.value - noise.value, "P_r / (N0 Rc)", p_rx, noise, unit="dB")
-    pg = derive(db(s.field.n_correlated * s.n_packets.value), "10 log10(correlated chips x packets)", s.n_packets, s.chip_rate_hz, unit="dB")
+    pg = derive(db(field.n_correlated * s.n_packets.value), "10 log10(correlated chips x packets)", s.n_packets, s.chip_rate_hz,
+                *((s.trn_units,) if field is s.trn_field else ()), unit="dB")
     wl = derive(db(enbw_bins(_window(s))), "10 log10(ENBW of the Doppler window)", s.n_packets, unit="dB")
     matched = derive(snr_chip.value + pg.value, "SNR(chip) + processing gain", snr_chip, pg, unit="dB")
     cell = derive(matched.value - wl.value, "SNR(chip) + processing gain - window loss", matched, wl, unit="dB")
@@ -191,9 +195,9 @@ def range_for_snr(snr_of_range, snr_req_db: float, lo: float = 0.5, hi: float = 
     return 0.5 * (lo + hi)
 
 
-def detection_range_m(s: Setup, kind: str, eirp: Num, snr_req_db: Num) -> Num:
+def detection_range_m(s: Setup, kind: str, eirp: Num, snr_req_db: Num, field=None) -> Num:
     """The range at which the cell SNR falls to ``snr_req_db`` (the table hands every row the same one)."""
-    r = range_for_snr(lambda x: link(s, kind, eirp, x).snr_cell_db.value, snr_req_db.value)
+    r = range_for_snr(lambda x: link(s, kind, eirp, x, field).snr_cell_db.value, snr_req_db.value)
     return derive(r, "SNR(cell)(R) = the required SNR", eirp, snr_req_db, s.pd, s.fe.nf_db, s.fe.rx_gain_dbi, s.rcs_dbsm, s.n_packets, unit="m")
 
 
@@ -250,13 +254,48 @@ def floor_rise_db(extra_dbm: float, noise_chip_dbm: float) -> float:
     return db(1.0 + undb(extra_dbm - noise_chip_dbm))
 
 
+def compression(env_unit: np.ndarray, strong_dbm: float, s: Setup, p: float | None = None) -> dict:
+    """What the receiver's compression does to a weak echo and to the noise riding with a strong static path of
+    ``strong_dbm`` whose envelope at unit mean power is ``env_unit``: fmcw_radar's small-signal result for a Rapp
+    limiter whose input 1 dB point is the in-band P1dB (dB: ``signal``, ``noise``, ``snr``, ``image``, ``strong``)."""
+    a1 = math.sqrt(undb(s.fe.p1db_inband_dbm.value))
+    return small_signal(math.sqrt(undb(strong_dbm)) * np.asarray(env_unit), a1, s.rx_rapp_p.value if p is None else p)
+
+
+def strong_level_for_snr_loss(env_unit: np.ndarray, s: Setup, loss_db: float, p: float | None = None) -> float | None:
+    """The level [dBm] of the strong path at which the echo's SNR is down ``loss_db`` (it falls monotonically and
+    stops at 3 dB, a hard limiter's figure); None when the limiter never costs that much."""
+    lo, hi = s.fe.p1db_inband_dbm.value - 60.0, s.fe.p1db_inband_dbm.value + 60.0
+    if compression(env_unit, hi, s, p)["snr"] > -loss_db:
+        return None
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if compression(env_unit, mid, s, p)["snr"] > -loss_db else (lo, mid)
+    return 0.5 * (lo + hi)
+
+
+def strong_level_for_image(env_unit: np.ndarray, s: Setup, image_dbc: float) -> float | None:
+    """The level [dBm] of the strong path at which the limiter's mirror image of the echo (at minus its Doppler)
+    reaches ``image_dbc`` under the echo itself.  The small-signal image is an upper bound when the strong path is
+    not a single tone, so this level is a lower bound; None when the image never gets that high."""
+    rel = lambda lvl: (lambda c: c["image"] - c["signal"])(compression(env_unit, lvl, s))      # noqa: E731
+    lo, hi = s.fe.p1db_inband_dbm.value - 60.0, s.fe.p1db_inband_dbm.value + 60.0
+    if rel(hi) < image_dbc:
+        return None
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if rel(mid) < image_dbc else (lo, mid)
+    return 0.5 * (lo + hi)
+
+
 @dataclass(frozen=True)
 class Monostatic:
     conducted_dbm: Num
     noise_chip_dbm: Num
     allowed_extra_dbm: Num           # what one mechanism may add under the thermal floor (the allowed desensitisation)
-    need_compression_db: Num         # isolation for the leakage to sit compression_margin under the in-band P1dB
-    need_compression_at_p1db_db: Num  # ... to sit exactly at P1dB (the margin taken as 0: the lower bound)
+    need_compression_db: Num         # isolation at which the receiver's compression costs the echo the allowed SNR
+    need_compression_at_p1db_db: Num  # ... at which the leakage sits exactly at the in-band P1dB (for reference)
+    compression_level_dbm: Num       # the leakage level of that criterion
     need_adc_db: Num                 # ... for the ADC's quantisation noise (the converter model's ENOB)
     need_pn_db: Num                  # ... for the leakage's residual LO phase noise
     pn_residual_dbc: Num
@@ -265,13 +304,18 @@ class Monostatic:
     have: tuple                      # ((label, isolation Num, shortfall Num, leak dBm Num, ENOB needed Num), ...)
 
 
-def monostatic_cost(s: Setup, eirp: Num) -> Monostatic:
+def monostatic_cost(s: Setup, eirp: Num, env_unit: np.ndarray) -> Monostatic:
     fe = s.fe
     cond = derive(eirp.value - fe.tx_gain_dbi.value, "EIRP - G_t", eirp, fe.tx_gain_dbi, unit="dBm")
     noise = derive(fe.noise_density_dbm_hz.value + db(s.chip_rate_hz.value), "k T0 F Rc", fe.nf_db, s.chip_rate_hz, unit="dBm")
     allowed = derive(noise.value + db(undb(s.desense_allowed_db.value) - 1.0), "N + 10 log10(10^(D/10) - 1)", noise, s.desense_allowed_db, unit="dBm")
     comp0 = derive(cond.value - fe.p1db_inband_dbm.value, "P_tx - P1dB(in band)", cond, fe.p1db_inband_dbm, unit="dB")
-    comp = derive(comp0.value + s.compression_margin_db.value, "P_tx - (P1dB(in band) - margin)", comp0, s.compression_margin_db, unit="dB")
+    level = strong_level_for_snr_loss(env_unit, s, s.desense_allowed_db.value)
+    if level is None:
+        raise ValueError("the limiter never costs the allowed desensitisation: the compression criterion has no level")
+    comp_level = derive(level, "the leakage level at which the limiter's small-signal SNR is down by the allowed desensitisation",
+                        fe.p1db_inband_dbm, s.rx_rapp_p, s.desense_allowed_db, s.rolloff, unit="dBm")
+    comp = derive(cond.value - level, "P_tx - that level", cond, comp_level, unit="dB")
     enob = s.adc_enob
     # the leakage level at which the model ADC's in-band noise equals the allowance
     leak_max = allowed.value + (db(1.5) + 2.0 * db(2.0) * enob.value - s.adc_backoff_db.value) + db(s.adc_osr.value)
@@ -288,4 +332,4 @@ def monostatic_cost(s: Setup, eirp: Num) -> Monostatic:
         b = derive(enob_required(leak.value, noise.value, s), "ENOB for the quantisation noise to cost the allowed desensitisation",
                    leak, noise, s.adc_backoff_db, s.adc_osr, s.desense_allowed_db, unit="bit")
         have.append((label, iso, short, leak, b))
-    return Monostatic(cond, noise, allowed, comp, comp0, adc, pn, res_dbc, needs[binding], binding, tuple(have))
+    return Monostatic(cond, noise, allowed, comp, comp0, comp_level, adc, pn, res_dbc, needs[binding], binding, tuple(have))

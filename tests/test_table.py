@@ -64,7 +64,8 @@ def test_every_row_is_held_to_the_same_required_snr(t):
     assert t["snr_required_db"] - t["snr_required_known_noise_db"] == pytest.approx(0.49, abs=0.005)
     s = t["setup"]
     for r in t["rows"][1:]:
-        at = budget.link(s, r["kind"], r["eirp_dbm"], r["range_pd_m"].value).snr_cell_db.value
+        field = s.trn_field if r["field"] == "TRN field" else s.field
+        at = budget.link(s, r["kind"], r["eirp_dbm"], r["range_pd_m"].value, field).snr_cell_db.value
         assert at == pytest.approx(req.value, abs=1e-6), (r["name"], r["limit"])
 
 
@@ -84,19 +85,22 @@ def test_the_numbers_the_conclusions_quote(t):
            "B comm range": rows[1]["range_pd_m"].value, "A range": rows[0]["range_pd_m"].value,
            "B res cm": rows[1]["range_res_m"].value * 100, "A res cm": rows[0]["range_res_m"].value * 100,
            "B width cm": rows[1]["range_width_m"].value * 100, "B clean": rows[1]["range_max_m"].value,
-           "need": t["monostatic"][0]["cost"].need_db.value, "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
+           "need": t["monostatic"][0]["cost"].need_db.value, "ghost": t["monostatic"][0]["ghost"]["need_sim_db"],
+           "B trn snr": rows[5]["snr_db"].value, "B trn radar snr": rows[6]["snr_db"].value, "air trn": rows[5]["air_fraction"].value * 100,
+           "comp 40": t["monostatic"][0]["checks"][1]["comp_snr_closed_db"], "image 40": t["monostatic"][0]["checks"][1]["comp_image_sim_dbc"], "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
            "need pn": t["monostatic"][0]["cost"].need_pn_db.value, "air": rows[1]["air_fraction"].value * 100, "air A": rows[0]["air_fraction"].value * 100}
     want = {"A snr": 43.34, "B comm snr": 30.74, "B radar snr": 28.74, "B comm range": 14.28, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
-            "B width cm": 7.43, "B clean": 10.90, "need": 56.0, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
+            "B width cm": 7.43, "B clean": 10.90, "need": 43.3, "ghost": 48.8, "B trn snr": 43.75, "B trn radar snr": 41.75, "air trn": 4.51, "comp 40": -2.11, "image 40": -11.4, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
     for k, v in want.items():
-        assert got[k] == pytest.approx(v, abs=0.006 if v < 20 or "snr" in k or "range" in k else 0.06), k
+        assert got[k] == pytest.approx(v, abs=0.006 if (abs(v) < 20 and k not in ("ghost", "image 40")) or "snr" in k or "range" in k else 0.06), k
     assert regulatory.comm_rate_mbps().value == 4620.0
     assert budget.snr_required_db(config.setup().pd.value, 1e-4) == pytest.approx(11.749, abs=1e-3)
 
 
 def test_golay_sidelobes_rise_with_velocity_from_exact_cancellation(t):
     g = t["golay"]
-    assert g[0][0] == 0.0 and g[0][1] < -250.0                     # the pair's cancellation at double precision
+    # at rest the pair cancels exactly: what is left is under the arithmetic's rounding, and is reported as that bound
+    assert g[0][0] == 0.0 and g[0][1] == t["rounding_dbc"]["l_cef"] < -200.0 and g[1][1] > g[0][1] + 100.0
     assert g[1][0] == 2.0 and -90.0 < g[1][1] < -85.0
     levels = [x[1] for x in g]
     assert levels == sorted(levels)
@@ -121,3 +125,53 @@ def test_every_number_cell_of_the_table_carries_a_tag(t):
                 n += 1
                 assert v.tag in TAGS and v.ref, (r["name"], k)
     assert n > 100
+
+
+def test_the_trn_field_is_built_from_the_entry_and_is_clean_on_blocks_2_to_5(t):
+    """The TRN rows' field: a TRN-R packet's units from edmg.trn_field, correlated on blocks 2-5 of every subfield."""
+    import numpy as np
+
+    from jcas60 import field as F
+    from jcas60 import sources as S
+    s = t["setup"]
+    f = s.trn_field
+    per_unit, n = F.trn_r_subfields_per_unit(), int(S.num("edmg.trn_field#trn_bl@trn_seq_length=normal").value)
+    assert (per_unit, n) == (10, 128) and f.chips.size == int(s.trn_units.value) * per_unit * 6 * n == 30720
+    assert f.n_correlated == int(s.trn_units.value) * per_unit * 4 * n == 20480 and len(f.windows) == 40
+    assert s.trn_packet_chips.value == s.packet_chips.value + f.chips.size and s.trn_packet_chips.value % 4 == 0   # the rotation carries on
+    # a delayed copy, any delay up to one block either way: the correlation over blocks 2-5 is the delay's and nothing else
+    for d in (0, 1, 57, 127, -1, -100):
+        got = sum(np.vdot(ref, f.chips[w0 + n * 6 - d: w0 + n * 6 - d + len(ref)]) for w0, ref in f.windows[:-1])
+        assert abs(got) < 1e-9 if d else abs(got - (len(f.windows) - 1) * 4 * n) < 1e-9
+    assert t["golay_trn"][0][1] == t["rounding_dbc"]["trn"] < -200 and -32 < t["golay_trn_all_blocks"] < -28   # all six blocks leave sidelobes
+    assert t["golay_trn"][1][0] == 2.0 and t["golay_trn"][1][1] < -80 and t["golay_trn"][1][2] > -0.01
+    # the number of units is the fewest that reach row A under the communication limit
+    a = t["rows"][0]["snr_db"].value
+    sweep = {u: snr for u, _, snr, *_ in t["trn_sweep"]}
+    assert sweep[int(s.trn_units.value)] >= a > sweep[int(s.trn_units.value) - 1]
+    assert sweep[int(s.trn_units.value)] == pytest.approx(t["rows"][5]["snr_db"].value, abs=1e-9)
+
+
+def test_the_two_correlators_agree():
+    """A long field is correlated through one FFT against a template, the L-CEF by gathering its two windows: the
+    same sums, checked on the L-CEF where both can run."""
+    import numpy as np
+
+    from jcas60 import wavesim as W
+    s = config.setup()
+    a, b = W.Simulator(s), W.Simulator(s)
+    assert not a._by_fft and W.Simulator(s, s.trn_field)._by_fft
+    tmpl = np.zeros(b.n, dtype=complex)
+    for w0, ref in s.field.windows:
+        tmpl[(b.start + w0) * b.osr: (b.start + w0 + len(ref)) * b.osr: b.osr] = ref
+    b._by_fft, b._tmpl_f = True, np.conj(np.fft.fft(tmpl))
+    paths = [W.Path(-85.0, 58.7 / s.chip_rate_hz.value, 4.0), W.Path(-28.0, s.leak_delay_s.value)]
+    x, y = a.frame(paths, W.Options(n_packets=2)).cir, b.frame(paths, W.Options(n_packets=2)).cir
+    assert np.abs(x - y).max() < 1e-12 * np.abs(x).max()
+
+
+def test_the_reader_finds_a_slow_target_next_to_the_ridge(t):
+    """The bistatic target sits 4.5 Doppler bins from the static direct path; the peak is read on its own bin, not
+    on the next one out (which reads 0.32 dB low)."""
+    for r in (t["rows"][3], t["rows"][4], t["rows"][7], t["rows"][8]):
+        assert abs(r["paths_delta_db"].value) < 0.2, (r["name"], r["limit"], r["paths_delta_db"].value)
