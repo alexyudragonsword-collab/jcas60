@@ -190,7 +190,7 @@ def compression_sweep(s: Setup, bench: _Bench, link: B.Link) -> dict:
     """The receiver's compression against the level of the leakage, on both roads: the echo's SNR (closed form:
     fmcw_radar's small-signal theory; simulation: noisy frames, against a linear receiver) and the image it throws
     at the mirrored Doppler (closed form: an upper bound; simulation: one noise-free frame per level)."""
-    sim, env = bench.sim, bench.sim.unit_envelope()
+    sim, env = bench.sim, bench.sim.unit_envelope(s.leak_delay_s.value)        # the leakage's envelope where the receiver samples it
     p1 = s.fe.p1db_inband_dbm.value
     span, step = float(s.sim["compression_span_db"]), float(s.sim["compression_step_db"])
     levels = p1 + np.arange(-span, span + step / 2, step)
@@ -228,7 +228,8 @@ def monostatic_block(s: Setup, bench: _Bench, reading: R.Reading, sweep: dict) -
         lin = bench.read([tgt, st], bench.options("monostatic"), near)
         adc = bench.read([tgt, st], bench.options("monostatic", adc_enob=s.adc_enob.value), near)
         pn = bench.read([tgt, st], bench.options("monostatic", lo="shared"), near)
-        q = bench.sim.frame([tgt, st], bench.options("monostatic", adc_enob=s.adc_enob.value), 0).quant
+        qs = [bench.sim.frame([tgt, st], bench.options("monostatic", adc_enob=s.adc_enob.value), k).quant for k in range(bench.frames)]
+        q = {k: float(np.mean([x[k] for x in qs])) for k in qs[0]}                     # over the frames the floor is read on
         comp = bench.read([tgt, st], bench.options("monostatic", rx_p1db_dbm=p1), near)
         quiet = bench.sim.read(bench.sim.frame([tgt, st], bench.options("monostatic", rx_p1db_dbm=p1, noise=False), 0), near, (0,))
         c = B.compression(sweep["env"], leak.value, s)
@@ -273,7 +274,7 @@ def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
     lin = bench.read([tgt, st], bench.options("bistatic"), near)
     pn = bench.read([tgt, st], bench.options("bistatic", lo="independent"), near)
     res = B.pn_residual_independent(s, s.field.n_correlated / s.chip_rate_hz.value)
-    comp = B.compression(bench.sim.unit_envelope(), direct.value, s)
+    comp = B.compression(bench.sim.unit_envelope(st.delay_s), direct.value, s)
     return {"reading": reading.name, "direct_dbm": direct, "comp_snr_closed_db": comp["snr"], "comp_image_closed_dbc": comp["image"] - comp["signal"],
             "enob_needed": derive(B.enob_required(direct.value, link.noise_chip_dbm.value, s), "ENOB for the quantisation noise to cost the allowed desensitisation",
                                   direct, link.noise_chip_dbm, s.adc_backoff_db, s.adc_osr, s.desense_allowed_db, unit="bit"),
@@ -600,7 +601,7 @@ def render(t: dict | None = None) -> str:
         w(f"  {ref_:72s} {val:>12s} [{n.tag}]")
     w(f"  row A: fmcw_radar@{A.provenance()['sha'][:7]} `{A.provenance()['command']}` (src/jcas60/data/upstream/fmcw_radar_budget.json)")
     w("")
-    w("== 11. the ay sensing frame against spec_sources' 802.11bf entries, item by item (law 7; the entries are from the task group's public documents) ==")
+    w("== 11. the ay sensing frame against spec_sources' 802.11bf entries, item by item (law 7; the entries are from the task groups' public documents) ==")
     for c in t["bf"]:
         w(f"  {c['row']:5s} {c['item']:38s} {c['verdict']:24s} here: {c['here']}")
         w(f"  {'':5s} {'':38s} {'':24s} entry ({c['key']}): {c['entry']}")

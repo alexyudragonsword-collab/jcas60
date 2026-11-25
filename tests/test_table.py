@@ -90,7 +90,7 @@ def test_the_numbers_the_conclusions_quote(t):
            "comp 40": t["monostatic"][0]["checks"][1]["comp_snr_closed_db"], "image 40": t["monostatic"][0]["checks"][1]["comp_image_sim_dbc"], "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
            "need pn": t["monostatic"][0]["cost"].need_pn_db.value, "air": rows[1]["air_fraction"].value * 100, "air A": rows[0]["air_fraction"].value * 100}
     want = {"A snr": 43.34, "B comm snr": 30.74, "B radar snr": 28.74, "B comm range": 14.28, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
-            "B width cm": 7.43, "B clean": 10.90, "need": 43.4, "ghost": 48.7, "B trn snr": 43.75, "B trn radar snr": 41.75, "air trn": 4.51, "comp 40": -2.12, "image 40": -11.8, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
+            "B width cm": 7.43, "B clean": 10.90, "need": 43.2, "ghost": 48.7, "B trn snr": 43.75, "B trn radar snr": 41.75, "air trn": 4.51, "comp 40": -2.17, "image 40": -11.8, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
     for k, v in want.items():
         assert got[k] == pytest.approx(v, abs=0.006 if (abs(v) < 20 and k not in ("ghost", "image 40")) or "snr" in k or "range" in k else 0.06), k
     assert regulatory.comm_rate_mbps().value == 4620.0
