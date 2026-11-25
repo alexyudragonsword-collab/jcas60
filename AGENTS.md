@@ -39,7 +39,7 @@
 4. **一个结论至少有两条独立的路**：闭式预算（`budget.py`）与波形级仿真（`wavesim.py`），差多少进表；差超过 1 dB 先查原因、写进 LOG，不调参数凑（`test_law4_*`）。只有一条路的结论在表里写明“只有闭式”。
 5. **数值指纹**：重构用 `tools/fingerprint.py` 证明逐位不变；记录入库（`tools/fingerprint.json`），CI 比较 base 与 head，`(numbers-move: 为什么)` 是逃生口（`tests/test_fingerprint.py`）。
 6. **vendor 纪律**：`src/jcas60/vendor/` 是可校验的副本——pin 完整 SHA，`tools/vendor_check.py --strict` 全过，只拷用到的文件及其依赖，正文不改（只许改 import 行）；A 行的报告由 `tools/upstream_report.py` 从 pin 的提交重新生成后核对（`tests/test_vendor.py`、`tests/test_table.py`）。
-7. **措辞**：本库的说法是“用 ay 波形做感知”，不作与 802.11bf 一致性有关的声称。spec_sources 有了 802.11bf 的条目（取自公开文件）之后，能说的只有逐项对过条目的那几件——`jcas60.bf`，示例 §11：对得上、条目没有定、没有条目，三种都照实写（`test_law7_*`）。
+7. **措辞**：本库的说法是“用 ay 波形做感知”，不作与 802.11bf 一致性有关的声称。spec_sources 有了 802.11bf 的条目（取自公开文件）之后，能说的只有逐项对过条目的那几件——`jcas60.bf`，示例 §11：对得上、对不上、条目没有定、没有条目，四种都照实写（`test_law7_*`）。
 
 ## 本仓库特有的硬规矩
 

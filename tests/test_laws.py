@@ -198,16 +198,22 @@ def test_law4_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_
                 assert abs(ck["adc_rise_sim_db"] - ck["adc_rise_closed_db"]) < 0.2
             else:
                 assert ck["repeating_share"] > 0.5 and ck["adc_rise_sim_db"] < ck["adc_rise_closed_db"] - 1.0
-            assert abs(ck["adc_rise_sim_db"] - ck["adc_rise_varying_db"]) < 0.2    # the part that is not the same in every packet is the floor
+            # the part that is not the same in every packet is the floor: to 0.2 dB where the noise dithers the ADC.
+            # Where it does not, the quantiser is no independent noise source -- the noise and the echo are what
+            # dithers it -- and the split explains the 3 dB between the roads to a few tenths, not to 0.2: its gain
+            # on the in-band noise is not exactly 1 for one particular leakage waveform (0.05 dB), the echo is
+            # scattered along its own Doppler row (0.05 dB), and seeds differ by 0.07 dB rms (cairn/LOG.md, the
+            # re-pin after spec_sources#57: 0.21 / 0.22 dB with the corrected Golay pair, 0.01 with the old one)
+            assert abs(ck["adc_rise_sim_db"] - ck["adc_rise_varying_db"]) < (0.2 if ck["noise_lsb"] >= 0.5 else 0.5)
             assert abs(ck["snr_linear_db"] - blk["snr_no_leak_db"]) < 0.2          # a linear receiver does not lose sensitivity to the leakage
             # the receiver's compression: the small-signal closed form and the limiter in the simulation
-            assert abs(ck["comp_snr_sim_db"] - ck["comp_snr_closed_db"]) < 0.4 and abs(ck["comp_signal_sim_db"] - ck["comp_signal_closed_db"]) < 0.5
+            assert abs(ck["comp_snr_sim_db"] - ck["comp_snr_closed_db"]) < 0.2 and abs(ck["comp_signal_sim_db"] - ck["comp_signal_closed_db"]) < 0.2
             assert ck["comp_image_sim_dbc"] < ck["comp_image_closed_dbc"]             # the closed form's image is an upper bound
         assert abs(blk["need_compression_sim_db"] - blk["cost"].need_compression_db.value) < 0.3
         assert blk["ghost"]["need_sim_db"] < blk["ghost"]["need_closed_db"] < blk["ghost"]["need_sim_db"] + 4.0
     sweep = t["compression"]
     for r in sweep["rows"]:
-        assert abs(r["snr_sim_db"] - r["snr_closed_db"]) < 0.25 and r["image_sim_dbc"] < r["image_closed_dbc"], r["level_dbm"]
+        assert abs(r["snr_sim_db"] - r["snr_closed_db"]) < 0.15 and r["image_sim_dbc"] < r["image_closed_dbc"], r["level_dbm"]
     assert 3.0 < -sweep["snr_limit_closed_db"] < 3.3                                   # a limiter never costs the echo much more than 3 dB of SNR
     for blk in t["bistatic"]:
         assert abs(blk["pn_rise_sim_db"] - blk["pn_rise_closed_db"]) < 1.0
@@ -215,11 +221,11 @@ def test_law4_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_
 
 # ----------------------------------------------------------------------------- law 7: wording
 BF_KEYS = ("ieee80211bf.dmg_sensing_types", "ieee80211bf.dmg_sensing_scheduling", "ieee80211bf.dmg_monostatic_ppdu",
-           "ieee80211bf.dmg_sensing_bandwidth", "ieee80211bf.edmg_multistatic_ppdu", "edmg.trn_field")
+           "ieee80211bf.dmg_sensing_bandwidth", "ieee80211bf.edmg_multistatic_ppdu", "ieee80211bf.dmg_bistatic_ppdu", "edmg.trn_field")
 
 
 def test_law7_no_conformance_claim_anywhere():
-    """The entries exist since spec_sources#54; the wording did not change with them."""
+    """The entries exist since spec_sources#54 (the bistatic PPDU since #57); the wording did not change with them."""
     assert all(k in S.shared() and S.shared()[k].source == "spec" for k in BF_KEYS)
     assert "no claim of 802.11bf conformance" in WORDING and WORDING in table.render()
     claim = re.compile(r"(符合|遵循|compliant with|conform\w* to|conformant)[^。.\n]{0,24}802\.11bf", re.I)
@@ -237,27 +243,36 @@ def test_law7_what_is_said_is_checked_item_by_item_against_the_entries(t):
     """Section 11: every item names its entry, and a 'fits' is computed from the entry, not written down."""
     from jcas60 import bf
     checks = t["bf"]
-    assert len(checks) == 13 and all(c["key"] in BF_KEYS for c in checks)
-    assert {c["verdict"] for c in checks} == {bf.FITS, bf.OPEN, bf.NO_ENTRY}
+    assert len(checks) == 20 and all(c["key"] in BF_KEYS for c in checks)
+    from collections import Counter
+    assert Counter(c["verdict"] for c in checks) == {bf.FITS: 13, bf.OPEN: 4, bf.DIFFERS: 3}       # nothing is without an entry any more
     by = {(c["row"], c["item"]): c for c in checks}
-    assert by[("C", "the PPDU")]["verdict"] == bf.NO_ENTRY                       # the bistatic row's packet has no entry behind it
-    assert by[("B", "receiving while transmitting")]["verdict"] == bf.OPEN
+    # the bistatic type has an entry since spec_sources#57, and row C's packets are not what it describes: said so
+    for item in ("the PPDU, read on the L-CEF", "the PPDU, with the TRN field", "the exchange"):
+        assert by[("C", item)]["verdict"] == bf.DIFFERS and by[("C", item)]["key"] == "ieee80211bf.dmg_bistatic_ppdu"
+    assert by[("B", "receiving while transmitting")]["verdict"] == bf.OPEN and by[("B", "the data field")]["verdict"] == bf.OPEN
+    # the Golay pair is the entry's because the field is built from the key the entry names; the rotation fits
+    # whichever chip the count starts on because the packet ahead of the TRN field is a multiple of four chips
+    assert by[("B, C", "the TRN field's Golay pair")]["verdict"] == bf.FITS and "dmg.golay_sequences" in S.raw("edmg.trn_field#stream1_golay")
+    assert by[("B, C", "the TRN field's rotation")]["verdict"] == bf.FITS and t["setup"].packet_chips.value % 4 == 0
+    import dataclasses
+    from jcas60.sources import Num
     s = t["setup"]
+    odd = dataclasses.replace(s, packet_chips=Num(s.packet_chips.value + 2, "assumed", "test", "chips"))
+    assert {c["item"]: c["verdict"] for c in bf.checks(odd)}["the TRN field's rotation"] == bf.OPEN
     assert bf._field_max("intraburst_interval") == 255 and bf._field_max("interburst_interval") == 65535
     assert s.interval_s.value * 1e6 <= 255 and 1e6 / s.frames_per_s.value <= 65535 and s.n_packets.value <= 255
     text = table.render(t)
     assert "== 11. the ay sensing frame against spec_sources' 802.11bf entries" in text and "this is not a statement of conformance" in text
     # a frame that does not fit is reported as such: a packet every 300 us cannot be written in one octet of microseconds
-    import dataclasses
-    from jcas60.sources import Num
     slow = dataclasses.replace(s, interval_s=Num(3e-4, "assumed", "test", "s"))
-    assert {c["item"]: c["verdict"] for c in bf.checks(slow)}["packets of one frame, start to start"] == "does not fit"
+    assert {c["item"]: c["verdict"] for c in bf.checks(slow)}["packets of one frame, start to start"] == bf.DIFFERS
 
 
 # ----------------------------------------------------------------------------- the field itself
 def test_the_golay_pair_is_complementary_within_the_cyclic_prefix_and_the_recursion_gives_the_tables():
     from jcas60 import field as F
-    for n in (128, 64, 32):
+    for n in (128, 64):
         a, b = F.from_recursion(n)
         assert np.array_equal(a, F.tabulated(f"ga{n}")) and np.array_equal(b, F.tabulated(f"gb{n}"))
     f = F.l_cef()

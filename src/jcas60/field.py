@@ -38,7 +38,7 @@ from .vendor.mmw60.ay import preamble as P
 
 
 def tabulated(name: str) -> np.ndarray:
-    """``ga128`` ... ``gb32`` as the entry tabulates them, in transmit order."""
+    """``ga128``, ``gb128``, ``ga64``, ``gb64`` as the entry tabulates them, in transmit order."""
     return np.asarray(S.raw(f"dmg.golay_sequences#{name}"), dtype=float)
 
 

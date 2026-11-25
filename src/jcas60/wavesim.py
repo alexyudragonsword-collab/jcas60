@@ -148,11 +148,14 @@ class Simulator:
         it is reported as this bound."""
         return 2.0 * db(float(np.finfo(float).eps) * self.n)
 
-    def unit_envelope(self) -> np.ndarray:
+    def unit_envelope(self, delay_s: float = 0.0) -> np.ndarray:
         """The transmitted field's envelope at unit mean power, one value per sample of the field: what a strong
-        static path (the leakage) looks like to the receiver's compression, up to its level."""
+        static path (the leakage) looks like to the receiver's compression, up to its level.  ``delay_s`` is that
+        path's delay: at ``samples_per_chip`` = 2 the envelope is under-sampled (its square reaches 1.25 chip rates),
+        so the average of anything non-linear in it depends on where in the chip the samples fall, and the closed
+        form has to take them where the simulated receiver does."""
         seg = slice(self.start * self.osr, (self.start + self.field.chips.size) * self.osr)
-        return np.abs(np.fft.ifft(self.tx_f)[seg]) / math.sqrt(self.tx_power)
+        return np.abs(np.fft.ifft(self.tx_f * np.exp(-2j * np.pi * self.freq * delay_s))[seg]) / math.sqrt(self.tx_power)
 
     def correlate(self, y: np.ndarray) -> np.ndarray:
         """Matched filter, then the summed cyclic correlations at every lag."""
@@ -212,8 +215,8 @@ class Simulator:
             # path's waveform when the thermal noise is too small to dither it) and the part that is not
             err = np.array(errors)
             total = float(np.mean(np.abs(err) ** 2))
-            vary = float(np.mean(np.abs(err - err.mean(axis=0)) ** 2))
-            out.quant = {"total_mw": total, "varying_mw": vary, "repeating_share": 1.0 - vary / total,
+            vary = float(np.mean(np.abs(err - err.mean(axis=0)) ** 2)) * m / max(m - 1, 1)     # the mean is taken off the same m packets
+            out.quant = {"total_mw": total, "varying_mw": vary, "repeating_share": max(0.0, 1.0 - vary / total),
                          "noise_lsb": sigma / (2.0 * full_scale / 2.0 ** opt.adc_enob)}
         out.rd = _rd.doppler_fft(cir, s.doppler_window, 1)
         return out
@@ -253,6 +256,10 @@ class Simulator:
         j = j0 - 2 * self.osr + int(dj)
         for lag in strong_lags:
             cols[max(0, lag - self.lag_lo - ex_r): lag - self.lag_lo + ex_r + 1] = False
+        # the floor only where every correlation window lies inside the transmitted field, the pulse's tails included:
+        # past the clean zone the windows slide off its end, and what the receiver does there (a limiter no longer held
+        # down by the static path, a quantiser with nothing to quantise) is not what it does to the echo
+        cols[self.lags > (self.field.zero_sidelobe_chips - int(s.sim["exclude_range_lags"])) * self.osr] = False
         r_idx, c_idx = np.flatnonzero(rows), np.flatnonzero(cols)
         sub = p[np.ix_(r_idx, c_idx)]
         floor = _rd.noise_floor(sub, (int(np.argmin(np.abs(r_idx - i))), int(np.searchsorted(c_idx, j))), (ex_d, ex_r))
