@@ -19,6 +19,7 @@ from functools import lru_cache
 import numpy as np
 
 from . import ENGINE_BANNER, WORDING, __version__
+from . import bf
 from . import budget as B
 from . import fmcw_row as A
 from . import regulatory as R
@@ -300,6 +301,7 @@ def build() -> dict:
         "golay": golay_under_doppler(s, bench, (0.0, s.velocity_mps.value, round(v_max, 1), 50.0, 200.0)),
         "pulse_sidelobes": pulse_sidelobes(s, bench), "width_measured_chips": measured_width_chips(s, bench),
         "sensitivity": sensitivity(s, comm, a["pfa"].value),
+        "bf": bf.checks(s),
         "snr_required_db": a["snr_required_db"].value,
         "snr_required_known_noise_db": B.snr_required_db(s.pd.value, a["pfa"].value),
         "range_known_noise_m": B.detection_range_m(s, "monostatic", comm.eirp_dbm, derive(B.snr_required_db(s.pd.value, a["pfa"].value),
@@ -465,4 +467,10 @@ def render(t: dict | None = None) -> str:
         val = "" if math.isnan(n.value) else f"{n.value:g}"
         w(f"  {ref_:72s} {val:>12s} [{n.tag}]")
     w(f"  row A: fmcw_radar@{A.provenance()['sha'][:7]} `{A.provenance()['command']}` (src/jcas60/data/upstream/fmcw_radar_budget.json)")
+    w("")
+    w("== 11. the ay sensing frame against spec_sources' 802.11bf entries, item by item (law 7; the entries are from the task group's public documents) ==")
+    for c in t["bf"]:
+        w(f"  {c['row']:5s} {c['item']:38s} {c['verdict']:24s} here: {c['here']}")
+        w(f"  {'':5s} {'':38s} {'':24s} entry ({c['key']}): {c['entry']}")
+    w("  this is not a statement of conformance: no sensing session, measurement exchange or frame of the procedure is built here, and the standard itself was not read")
     return "\n".join(L) + "\n"

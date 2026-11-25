@@ -95,13 +95,6 @@ entries:
     cite: "本库；模型是 tgad_em.pn_model_shape / tgad_em.pn_params"
     note: "B、C 两行的本振相噪取 TGad 评估方法学的模型（PSD0 −90 dBc/Hz，1 MHz 处 −93 dBc/Hz，与雷达芯片手册 1 MHz 处的数同量级）。单站收发共用一个本振，双站两台各一个、互不相关。A 行的本振是 fmcw_radar 自己的 ADPLL（要出 chirp，换不成固定本振）：这是三行里唯一不是同一个数的前端量，对照表里标明。换了会动什么：单站泄漏的相噪残余与双站直达径的相噪逐 dB 跟着 PSD 动；热噪声限的 SNR 不动。"
 
-  jcas60.oxygen_frequency_ghz:
-    value: 60.0
-    unit: GHz
-    source: assumed
-    cite: "本库；衰减是 itu_p676.gamma_o_dry_sea_level 在这个频点的值"
-    note: "氧气衰减取表里 60 GHz 的点（14.651 dB/km），用在 60.48 GHz 上，因为表里没有 60.48 GHz（spec_sources#54 顺带请它补）。换了会动什么：5 m 处往返 10 m，表里 60–60.81 GHz 之间最多差 0.41 dB/km，即 0.004 dB；Pd 0.9 的最远距离上（十几米）不到 0.02 dB。"
-
   # ------------------------------------------------------------ 目标与检测
   jcas60.target:
     value: {range_m: 5.0, velocity_mps: 2.0}

@@ -16,13 +16,13 @@ authoring_mode: ai_generated
 
 | # | 铁律 | 实现 | 守护测试 | 状态 |
 |---|---|---|---|---|
-| 1 | 外部数字只从 spec_sources 进来，带标签 | `sources.py`：vendored spec_sources 五张表 + 本库 `data/assumed.yaml`（`jcas60.*`，20 条，全 assumed）+ mmw60_trx 自己的表，用 spec_sources 的读取器合起来、同键报错；数以 `Num`（值、标签、引用）流动，`derive()` 标 derived 并带上输入里最弱的标签（`[derived/assumed]`）；每次读取进 `TRACE`，示例 §10 整份打印 | `test_laws.py::test_law1_every_reference_read_resolves_…`、`_the_three_tables_are_kept_apart_by_prefix`、`_own_entries_are_all_assumed_and_say_what_would_move`、`_grep_count_of_each_tag_equals_the_entries`、`_no_stray_numbers_in_the_code`（AST 扫本库代码里的数字字面量：`physconst.py` 之外只许一位有效数字的算术常数与列明的几个） | 守住 |
+| 1 | 外部数字只从 spec_sources 进来，带标签 | `sources.py`：vendored spec_sources 五张表 + 本库 `data/assumed.yaml`（`jcas60.*`，19 条，全 assumed）+ mmw60_trx 自己的表，用 spec_sources 的读取器合起来、同键报错；数以 `Num`（值、标签、引用）流动，`derive()` 标 derived 并带上输入里最弱的标签（`[derived/assumed]`）；每次读取进 `TRACE`，示例 §10 整份打印 | `test_laws.py::test_law1_every_reference_read_resolves_…`、`_the_three_tables_are_kept_apart_by_prefix`、`_own_entries_are_all_assumed_and_say_what_would_move`、`_grep_count_of_each_tag_equals_the_entries`、`_no_stray_numbers_in_the_code`（AST 扫本库代码里的数字字面量：`physconst.py` 之外只许一位有效数字的算术常数与列明的几个） | 守住 |
 | 2 | 同一套前端数字 | `frontend.py::shared()` 是唯一读前端引用的地方，一个 frozen `FrontEnd` 实例经 `config.setup()` 交给预算、仿真、法规与表；PA 回退是一条规则 `max(0, P + G − 上限)` | `test_law2_one_front_end_instance_serves_every_row`、`_row_a_ran_on_the_same_numbers`（A 行报告的 9 个输入逐项相等；规则给出的回退 = 报告的 8 dB）、`_front_end_numbers_are_read_in_one_module_only`、`_the_lo_is_named_as_the_one_number_not_shared` | 守住；本振例外，表里标明 |
 | 3 | 各按各的法规上限 | `regulatory.py`：通信读法读 `fcc15255.eirp_avg_dbm`，雷达读法跑 vendored 的 `link/compliance.py`；ay 每行两个版本 | `test_law3_every_row_states_its_rule_and_limit_…`、`_no_row_runs_at_another_rows_limit`、`_the_vendored_check_reproduces_fmcw_radars_own_report`（逐字的副本经 `check_emission`、限值由本库的 `fcc_number` 从 spec_sources 取，在 fmcw_radar 默认帧上逐档等于它的报告） | 守住 |
 | 4 | 两条独立的路 | `budget.py`（雷达方程 + 处理增益；压缩 / ADC / 相噪三项判据）对 `wavesim.py`（vendored Golay → L-CEF → 成形 → 点目标信道 → 相关接收 → 距离-多普勒图，用 fmcw_radar 的读图函数读峰与底） | `test_law4_the_two_roads_agree_within_1_db_on_every_ay_row`（现状 < 0.3 dB）、`_the_difference_is_a_column_of_the_table`、`_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_hold` | 守住；压缩判据只有闭式，表里写明 |
 | 5 | 数值指纹 | `tools/fingerprint.py`：表的每个数、两条路的中间量、发射场与四种仿真帧的图，504 个值（标量 repr、数组 SHA-256）；记录 `tools/fingerprint.json` 入库并带环境；CI 的 fingerprint 作业并排记录 base 与 head | `tests/test_fingerprint.py` | 守住 |
 | 6 | vendor 纪律 | `src/jcas60/vendor/`：16 个文件，15 verbatim、1 adapted（`processing/rd.py` 的一行 import；2026-11-25 重新 pin 之前是 15 个、13 + 2）；`tools/vendor_check.py --strict`；A 行的报告不是上游仓库里的文件，由 `tools/upstream_report.py` 从 pin 的提交（`git archive` 导出到临时目录）重新生成后核对 | `tests/test_vendor.py`（完整 SHA、三处写的 pin 一致、strict 通过、只拷用到的）、`test_table.py::test_the_recorded_report_is_what_the_pinned_fmcw_radar_writes`；CI 的 vendor-drift 作业把三个上游检出到 pin 上真跑 | 守住 |
-| 7 | 措辞 | `jcas60.WORDING`，示例第 2 行 | `test_law7_no_802_11bf_entry_no_conformance_claim`（共享表里没有 802.11bf 的键；全仓库没有一句一致性声称） | 守住；spec_sources#54 有了条目再议 |
+| 7 | 措辞 | `jcas60.WORDING`，示例第 2 行；`bf.py` 把感知帧逐项对 spec_sources 的 802.11bf 条目（示例 §11），每项给出条目、本库的做法与“对得上 / 条目没有定 / 没有条目” | `test_law7_no_conformance_claim_anywhere`（全仓库没有一句一致性声称）、`_what_is_said_is_checked_item_by_item_against_the_entries`（“对得上”是由条目算出来的；放不进字段的帧会被报出来） | 守住。2026-11-25 之前的写法是“有条目之前不说”：条目到了（spec_sources#54），措辞没有放宽，多了逐项核对 |
 
 ## 里程碑 0 的边界
 
@@ -33,7 +33,7 @@ authoring_mode: ai_generated
 ## 分层
 
 ```
-sources (三张表, Num, TRACE)
+sources (三张表, Num, TRACE)        bf (感知帧 ↔ 802.11bf 条目, 只报告不出数)
    └─ frontend.shared() ── config.setup() ──┬─ budget   (闭式)
 field.l_cef() (vendor: preamble, golay) ────┤─ wavesim  (波形级; vendor: rd, cfar)
 fmcw_row (报告 JSON, 示例 00 文本) ─────────┤─ regulatory (vendor: compliance)
