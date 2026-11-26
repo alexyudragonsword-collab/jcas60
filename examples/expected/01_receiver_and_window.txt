@@ -166,3 +166,48 @@ sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11
                  768      65.41                               -21.0 dB     -21.0 dB
                  826      70.35                               -21.0 dB     -21.0 dB
   against section 3: the standard subfield shows a target 256 chips past its place 6.1 dB down and folds at 768 chips; this one is clean to 256 chips, noise-like about 21 dB down from there to 768, and folds at 1024 chips
+
+== 12. the limiter's knee from measured curves (ROADMAP item 1; spec_sources#59: two 60 GHz compression curves read off the papers' figures, fitted with the same Rapp model) ==
+                               curve  points   its P1dB   p, P1dB as published   residual rms / worst   p, P1dB fitted too       P1dB       rms     compression 3 dB over P1dB   p from that point
+    rx60.amp_spasaro2024_compression      16  -21.8 dBm                  0.898       0.005 / 0.011 dB                0.904 -21.77 dBm  0.005 dB                        1.69 dB               0.859
+       rx60.rx_moody2023_compression      11  -21.5 dBm                  1.618       0.085 / 0.199 dB                1.383 -22.16 dBm  0.075 dB                        2.22 dB               1.484
+  the table's knee is p = 2, fmcw_radar's placeholder: 2.61 dB of compression at that point.  Both measured curves bend more gently
+  what each knee makes of row B (communication limit; the radar chip's own P1dB kept, only the shape exchanged; 4 samples a chip):
+                                knee   compression needs: closed  simulated  phase noise       ADC   isolation needed                     what binds   against 40 dB   ghost under the floor: bound  simulated
+                   p = 2 (the table)                    43.24 dB                42.98 dB  39.88 dB           43.24 dB            in-band compression        +3.24 dB
+            p = 0.898 (an amplifier)                    35.45 dB   35.44 dB     42.98 dB  39.88 dB           42.98 dB  LO phase noise on the leakage        +2.98 dB                       51.96 dB   46.73 dB
+              p = 1.618 (a receiver)                    41.93 dB   41.97 dB     42.98 dB  39.88 dB           42.98 dB  LO phase noise on the leakage        +2.98 dB                       51.21 dB   48.37 dB
+  the ghost's closed form is the small-signal image, an upper bound once the leakage is deep in the limiter (the table's section 5); the simulated figure is the reading
+  a gentler knee lets the compression criterion go and leaves the LO's phase noise on the leakage as what binds: the isolation needed hardly moves, the reason does
+  not known from these curves: AM/PM (neither paper gives it), memory, and whether the radar chip's receiver bends like either device
+  another radar chip's datasheet (rx60.radar_bgt60tr13c): TX-to-RX isolation 50 dB typ at the die, package excluded -- +6.76 dB against the table's need; its receiver's P1dB is -5 dBm typ, one number, no curve
+
+== 13. the long TRN subfield: TRN_BL = 256 (ROADMAP item 2; the pair is spec_sources#59's edmg.golay_sequences_long) ==
+  Ga256 / Gb256: the entry's D and W through the recursion give the tabulated sequences: yes; aperiodic autocorrelations summed: 512 at zero shift, 0 at the worst other
+                                    field   correlated chips             clean zone   SNR(cell)   on the grid: closed  simulated   range at Pd 0.9 by SNR   sidelobes at rest   at 2 m/s
+       TRN_BL = 128, 4 units  30720 chips              20480    128 chips = 10.90 m    43.75 dB              42.88 dB   42.85 dB                  30.12 m          -216.7 dBc  -84.4 dBc
+       TRN_BL = 256, 2 units  30720 chips              20480    256 chips = 21.80 m    43.75 dB              42.88 dB   42.89 dB                  30.12 m          -216.7 dBc  -80.2 dBc
+   target at [chips]  range [m]    strongest on lags 0-248: chips road   simulation   shows at [chips]
+                 128      10.90                                 0.0 dB       0.0 dB                128
+                 256      21.80                              -216.7 dB    -216.7 dB                  —
+                 314      26.74                               -28.4 dB     -28.4 dB                 13
+                 384      32.70                               -27.5 dB     -27.5 dB                 19
+                 512      43.61                                -6.2 dB      -6.2 dB                  0
+                 640      54.51                                -6.2 dB      -6.2 dB                128
+                 768      65.41                               -22.1 dB     -22.1 dB                 45
+                1024      87.21                               -17.9 dB     -17.9 dB                 91
+                1280     109.02                               -21.3 dB     -21.3 dB                165
+                1536     130.82                                -0.4 dB      -0.4 dB                  0
+                1600     136.27                                -0.4 dB      -0.4 dB                 64
+  the worst a target anywhere past the window does: -0.4 dB, from 1600 chips; the subfield is 1536 chips, where a target folds back whole.  The same field length, air time and SNR as the table's TRN rows, twice the clean zone, the ghost twice as far
+
+== 14. the bistatic exchange as the entry has it (ROADMAP item 13; ieee80211bf.dmg_bistatic_ppdu after spec_sources#59; closed form only: arithmetic on packet lengths) ==
+  a BRP frame (Action No Ack (Unprotected DMG category); 33 octets of body known) in an SC packet carries at least 18 SC blocks: 9280 chips, 5.27 us of data field
+  the sounding packet 20.51 -> 25.78 us; the BRP frame that comes back 8.33 us; SIFS 3 us between one station's frames, at most BRPIFS 44 us before the other's
+                                                         air time   packet interval      unambiguous to +-   velocity resolution
+  row C as the table has it (one way, no data field)       4.51 %         100.00 us              12.39 m/s              0.39 m/s
+  one exchange a frame: 64 frames at SIFS, one reply       5.67 %          28.78 us              43.06 m/s              1.35 m/s
+        one exchange a packet, at the table interval      15.00 %         100.00 us              12.39 m/s              0.39 m/s
+  one exchange a frame: 5.55 % if the reply comes after SIFS; the packets cannot be spread out, so the Doppler axis is the packet's own length
+  one exchange a packet: sounding, BRPIFS and reply take 78.11 us of the 100 us (fits); 6.55 % is emitted, the rest of the 15.00 % is the medium held through BRPIFS
+  not found in public material (spec_sources#59): the MAC header's length, a reply once per several exchanges, an exchange with no reply

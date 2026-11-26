@@ -37,14 +37,24 @@ from . import sources as S
 from .vendor.mmw60.ay import preamble as P
 
 
+def _golay_entry(n: int) -> str:
+    """Where a pair of length ``n`` is tabulated: the DMG pairs (64, 128) or the EDMG first stream's long ones (256, 512)."""
+    for key in ("dmg.golay_sequences", "edmg.golay_sequences_long"):
+        if f"ga{n}" in S.raw(key):
+            return key
+    raise KeyError(f"no tabulated Golay pair of length {n}")
+
+
 def tabulated(name: str) -> np.ndarray:
-    """``ga128``, ``gb128``, ``ga64``, ``gb64`` as the entry tabulates them, in transmit order."""
-    return np.asarray(S.raw(f"dmg.golay_sequences#{name}"), dtype=float)
+    """``ga128``, ``gb128``, ``ga64``, ``gb64`` -- and, for the EDMG first stream, ``ga256`` ... ``gb512`` -- as the
+    entries tabulate them, in transmit order."""
+    return np.asarray(S.raw(f"{_golay_entry(int(name[2:]))}#{name}"), dtype=float)
 
 
 def from_recursion(n: int) -> tuple[np.ndarray, np.ndarray]:
     """(Ga_n, Gb_n) from the entry's D_k / W_k: the recursion read backwards, as the entry says."""
-    return P.pair_from_recursion(S.raw(f"dmg.golay_sequences#d_{n}"), S.raw(f"dmg.golay_sequences#w_{n}"))
+    key = _golay_entry(n)
+    return P.pair_from_recursion(S.raw(f"{key}#d_{n}"), S.raw(f"{key}#w_{n}"))
 
 
 @dataclass(frozen=True)
@@ -89,7 +99,7 @@ def trn_r_subfields_per_unit() -> int:
 
 
 @lru_cache(maxsize=4)
-def trn(units: int, blocks: tuple) -> Field:
+def trn(units: int, blocks: tuple, seq_length: str = "normal") -> Field:
     """The TRN field of an EDMG TRN-R packet, ``units`` units long, with the correlation windows on the ``blocks``
     (1-based) of every subfield.
 
@@ -98,8 +108,9 @@ def trn(units: int, blocks: tuple) -> Field:
     own signs, the two Ga and the two Gb give R_a + R_b = 0 off the peak and the four neighbour terms come out
     -C_ab - C_ba + C_ab + C_ba = 0: no sidelobe within a block either way, blocks 1 and 6 standing guard.  With
     all six the neighbour terms leave -(C_ab + C_ba).  Built by mmw60_trx's ``compose`` and ``rotate`` (vendored)
-    from the entry's block list."""
-    n = int(S.num("edmg.trn_field#trn_bl@trn_seq_length=normal").value)
+    from the entry's block list.  ``seq_length`` is the entry's TRN_SEQ_LENGTH: ``long`` makes every block 256 chips
+    (the EDMG first stream's Ga256 / Gb256), the subfield and the clean zone twice as long."""
+    n = int(S.num(f"edmg.trn_field#trn_bl@trn_seq_length={seq_length}").value)
     ga, gb = tabulated(f"ga{n}"), tabulated(f"gb{n}")
     items = list(S.raw("edmg.trn_field#basic_subfield"))
     sub = P.compose({"Ga_N": ga, "Gb_N": gb}, items)
