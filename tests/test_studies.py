@@ -257,3 +257,46 @@ def test_what_a_strong_target_leaves_in_doppler_and_a_static_reflector(st):
     cl = sec["clutter"]
     assert abs(cl["rise_sim_db"] - cl["rise_closed_db"]) < 0.2 and cl["rise_closed_db"] == pytest.approx(1.08, abs=0.006)
     assert abs(cl["snr_linear_db"] - cl["snr_alone_db"]) < 0.1                     # an ideal LO: the reflector costs the mover nothing
+
+
+# ----------------------------------------------------------------------------- 11. a waveform made for sensing
+def test_the_designed_waveform_against_the_standard_subfield(st):
+    dw = st["designed"]
+    std, new = dw["rows"]
+    # every block between the guards, a whole number of periods; the clean zone twice the standard subfield's
+    assert (std["correlated_chips"], new["correlated_chips"]) == (20480, 29 * 1024) and dw["gain_db"] == pytest.approx(1.61, abs=0.006)
+    assert (std["clean_chips"], new["clean_chips"]) == (128, 256) and new["clean_m"] == pytest.approx(21.80, abs=0.006)
+    for r in (std, new):
+        assert abs(r["snr_sim_db"] - r["snr_grid_db"]) < 0.15                       # law 4
+        assert r["sidelobe_rest_dbc"] < -200.0 and r["sidelobe_moving_dbc"] < -75.0
+    assert new["snr_cell_db"] - std["snr_cell_db"] == pytest.approx(dw["gain_db"], abs=1e-9)
+    # the entry's four conditions: three fit, the spectral one does not -- and backing off to meet it takes the SNR gain back
+    cd = dw["conditions"]
+    assert cd["length_chips"][0] == cd["length_chips"][1] and cd["modulus_max_error"] < 1e-12 and cd["consecutive_same_sequence"][0] <= cd["consecutive_same_sequence"][1]
+    assert cd["psd_average_hz"] == 10e6 and cd["psd_excess_max_db"] == pytest.approx(1.86, abs=0.006) and abs(cd["psd_total_db"]) < 1e-9
+    assert dw["gain_db"] - cd["psd_excess_max_db"] < 0.0
+    # either side of a target: nothing out to two blocks, noise-like from there to six, the whole target again at eight
+    clean, noisy, fold = dw["zones"]
+    assert (clean["from_chips"], clean["to_chips"]) == (1, 256) and db(clean["level"]) < -200.0
+    assert -22.0 < db(noisy["level"]) < -20.0 and db(fold["level"]) > -0.5 and fold["from_chips"] == 1024
+    rows = {r["delay_chips"]: r for r in dw["beyond"]}
+    for r in rows.values():                                                         # the chips alone and the waveform simulation
+        assert db(r["level_sim"]) == pytest.approx(db(r["level_closed"]), abs=0.01)
+    for d in (58, 128, 160, 192):                                                   # targets the standard subfield's window ends before
+        assert rows[d]["lag_sim"] == d and db(rows[d]["level_sim"]) == pytest.approx(0.0, abs=0.01)
+    assert rows[256]["lag_sim"] is None and all(db(rows[d]["level_sim"]) < -20.0 for d in (314, 384, 512, 640, 768, 826))
+
+
+def test_the_designed_pattern_is_built_on_the_perfect_sequence():
+    """The sign pattern's two halves: each a length-4 sequence whose periodic autocorrelation is zero off the peak,
+    and whose cross-correlation is zero at the two shifts that neighbouring blocks meet at."""
+    import numpy as np
+
+    from jcas60 import sources as S_
+    items = list(S_.raw("jcas60.sensing_waveform#pattern"))
+    assert [x.strip("+-") for x in items] == ["Ga_N", "Gb_N"] * 4
+    sign = np.array([1 if x[0] == "+" else -1 for x in items])
+    e, o = sign[0::2], sign[1::2]
+    acf = lambda x, m: int(np.sum(x * np.roll(x, m)))                              # noqa: E731
+    assert [acf(e, m) for m in range(4)] == [4, 0, 0, 0] and [acf(o, m) for m in range(4)] == [4, 0, 0, 0]
+    assert int(np.sum(e * o)) == 0 and int(np.sum(e * np.roll(o, 1))) == 0

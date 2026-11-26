@@ -120,3 +120,29 @@ def trn(units: int, blocks: tuple) -> Field:
     if not all(1 <= b <= len(items) for b in blocks):
         raise ValueError(f"blocks must be 1 .. {len(items)}")
     return Field(chips=chips, n0=0, windows=wins, zero_sidelobe_chips=n)
+
+
+@lru_cache(maxsize=4)
+def designed(units: int) -> Field:
+    """A waveform for the TRN field made for sensing (``jcas60.sensing_waveform``), as long as the TRN field of
+    ``units`` units: Ga / Gb alternating, the signs periodic over the pattern's blocks.  With the pattern built on
+    the length-4 perfect binary sequence the neighbours' cross-correlations cancel over one period, so every block is
+    correlated -- all but the guard blocks at the two ends, chosen so that a whole number of periods is left (a
+    partial period does not cancel).  The windows are one period long; the clean zone is ``clean_blocks`` blocks
+    either way, which a test holds against the chips."""
+    n = int(S.num("edmg.trn_field#trn_bl@trn_seq_length=normal").value)
+    ga, gb = tabulated(f"ga{n}"), tabulated(f"gb{n}")
+    items = list(S.raw("jcas60.sensing_waveform#pattern"))
+    guard = int(S.num("jcas60.sensing_waveform#guard_blocks").value)
+    period = P.compose({"Ga_N": ga, "Gb_N": gb}, items)
+    blocks = int(units) * trn_r_subfields_per_unit() * len(S.raw("edmg.trn_field#basic_subfield"))
+    if blocks % len(items):
+        raise ValueError(f"the TRN field's {blocks} blocks are not a whole number of the pattern's {len(items)}")
+    chips = P.rotate(np.tile(period, blocks // len(items)))
+    chips.setflags(write=False)
+    first, last = guard, blocks - guard
+    starts = range(first, last, len(items))
+    if (last - first) % len(items):
+        raise ValueError("the guard blocks do not leave a whole number of periods to correlate")
+    wins = tuple((b * n, chips[b * n: (b + len(items)) * n]) for b in starts)
+    return Field(chips=chips, n0=0, windows=wins, zero_sidelobe_chips=int(S.num("jcas60.sensing_waveform#clean_blocks").value) * n)

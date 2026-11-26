@@ -160,3 +160,10 @@ entries:
     source: assumed
     cite: "本库；ROADMAP“没有做的”各条的研究（jcas60.studies，示例 01）；近处反射体的两个数与 fmcw_radar 的 configs/radar_60g_mimo.yaml 相同"
     note: "对照表之外的几项研究怎么扫。frames：每个读数平均几帧（同一组噪声下比“带限幅器”与“不带”，4 帧够）。analog_samples_per_chip：限幅器之前的模拟部分按每码片几个采样算（2 就是 ADC 自己的速率；往上是在问连续时间的限幅器是多少）；knee_rate：扫膝部时用哪个速率；knees：Rapp 的 p 取哪几个（1 软、3 硬，2 是 fmcw_radar 的占位值）；level_offsets_db：在闭式给的电平上下各取几点让仿真找“SNR 掉 1 dB”的交点。beyond_delays_chips：窗外的目标放在哪些时延上（58 是 5 m，314 = 58 + 256、826 = 58 + 768 是它多出两段、六段的位置）；beyond_buffer_chips：为此把 L-CEF 的缓冲加长到多少；window_ranges_m：窗内核两条路的几个距离；floor_margin_chips：找假峰时离窗的远端留几个码片。fast_velocities_mps：包内相干损失在目标速度与不模糊速度之外再看哪两个速度。adc_delays / adc_delay_step_chips：ADC 抖不开时把目标放在多少个时延上、相邻差多少码片（取非整数让采样相位也跟着变）；adc_dither_lsb：试哪几个抖动量（每路的高斯噪声 rms，加在量化之前、不减回去）。leak_delays_s：泄漏的时延扫哪几个；reflector_range_m / reflector_level_db：近处反射体离天线多远、比直接泄漏低多少（取 fmcw_radar 的 radar_60g_mimo.yaml 里那一个：2 cm、−10 dB，它也是假设）。cfo_hz：双站两台设备之间留下的载波频偏试哪几个——5 kHz 是 mmw60_trx 说它的 STF 估计残差的上限（它的铁律 3，没有成条目的数），50 kHz 是差十倍的估计，2.42 MHz 是两边各 ±20 ppm 在 60.48 GHz 上完全不补偿（±20 ppm 是 802.11ad 的容差，spec_sources 没有这一条，这里当假设）。mask_offsets_chips：强目标在距它多少码片处留下的电平要读（各取 ±半码片内的最大值，不读单格）；scan_step_chip：量距离响应时目标每次挪多少；doppler_offsets_bins：慢时间上离强目标多少格以外取包络；clutter_over_target_db / clutter_range_m：静止杂波比目标强多少、放在多远（一面墙或一件家具的量级，没有出处）。换了会动什么：只是多扫或少扫几个点；速率取到 4 以上判据不再动（示例 01 §1），帧数只动读数的起伏。"
+
+  jcas60.sensing_waveform:
+    value: {pattern: ["+Ga_N", "+Gb_N", "+Ga_N", "-Gb_N", "+Ga_N", "+Gb_N", "-Ga_N", "+Gb_N"], guard_blocks: 4, clean_blocks: 2}
+    unit: "sequences, 段, 段"
+    source: assumed
+    cite: "本库；条目 ieee80211bf.dmg_monostatic_ppdu 允许单站在 TRN 场里放满足四个条件的任意波形；序列是 dmg.golay_sequences 的 Ga128 / Gb128"
+    note: "为感知设计的 TRN 场波形（示例 01 §11）：整场 Ga128 / Gb128 交替，符号以 8 段为周期。偶数段的符号 [+ + + −] 是长 4 的完美二元序列（周期自相关在非零移位上为零），奇数段的符号是它移 2 位 [+ − + +]：相邻段的互相关按符号抵消，所以每一段都能相关；时延差在 clean_blocks 段（256 码片）以内旁瓣严格为零——干净区是标准子字段的两倍（示例 01 §11 用码片的相关核过，两侧都是）。两端各留 guard_blocks 段不相关：被相关的是整 29 个周期，两头各 4 段当保护（少于整周期时相邻段的互相关抵不干净，保护取 1 段时旁瓣从舍入界升到 −58 dB）。场长与标准 TRN 场相同（jcas60.trn_sensing 的单元数）。换了会动什么：换成别的符号图样，干净区缩回一段或窗外重新出离散的假峰（标准子字段在多出 2 段处是 −6.1 dB）；周期取 8 段时整个折回在 1024 码片 = 87.2 m。"
