@@ -153,3 +153,10 @@ entries:
     source: assumed
     cite: "本库；CFAR 的保护格与训练格等于 fmcw_radar 默认配置"
     note: "波形级仿真的数值设置：随机种子、SNR 取几帧的平均（峰上的噪声起伏每帧约 ±0.2 dB）、每个包的缓冲长度、读噪底时绕开峰的格数（距离上同一个数也用来绕开强径所在的时延，并让噪底只读到干净窗的远端以内这么多码片：再远相关窗滑出发射场，接收机在那里的行为不是它对回波的行为）、找峰时离零多普勒至少几格（静止径在多普勒窗主瓣里的那几格：Hann 是 ±2）、扫压缩时泄漏电平在带内 P1dB 上下各扫多宽、步长多少。换了会动什么：只动读数的统计起伏（8 帧平均后约 ±0.1 dB），不动期望值——除了 exclude_range_lags 取 0：深压缩下噪底读进窗外的时延，高 0.4 dB；缓冲短于场长加最大时延时结果是错的（代码里检查）。"
+
+  jcas60.studies:
+    value: {frames: 4, analog_samples_per_chip: [2, 4, 8], knee_rate: 4, knees: [1, 2, 3], level_offsets_db: [-3, -1, 1, 3], beyond_buffer_chips: 4096, beyond_delays_chips: [58, 128, 160, 192, 256, 314, 384, 512, 640, 768, 826], window_ranges_m: [2, 5, 8, 10], floor_margin_chips: 8}
+    unit: "帧, 采样/码片, 采样/码片, -, dB, 码片, 码片, m, 码片"
+    source: assumed
+    cite: "本库；ROADMAP“没有做的”第 1–3 条的研究（jcas60.studies，示例 01）"
+    note: "对照表之外的几项研究怎么扫。frames：每个读数平均几帧（同一组噪声下比“带限幅器”与“不带”，4 帧够）。analog_samples_per_chip：限幅器之前的模拟部分按每码片几个采样算（2 就是 ADC 自己的速率；往上是在问连续时间的限幅器是多少）；knee_rate：扫膝部时用哪个速率；knees：Rapp 的 p 取哪几个（1 软、3 硬，2 是 fmcw_radar 的占位值）；level_offsets_db：在闭式给的电平上下各取几点让仿真找“SNR 掉 1 dB”的交点。beyond_delays_chips：窗外的目标放在哪些时延上（58 是 5 m，314 = 58 + 256、826 = 58 + 768 是它多出两段、六段的位置）；beyond_buffer_chips：为此把 L-CEF 的缓冲加长到多少；window_ranges_m：窗内核两条路的几个距离；floor_margin_chips：找假峰时离窗的远端留几个码片。换了会动什么：只是多扫或少扫几个点；速率取到 4 以上判据不再动（示例 01 §1），帧数只动读数的起伏。"
