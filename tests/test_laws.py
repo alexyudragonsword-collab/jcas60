@@ -71,7 +71,7 @@ ALLOWED = {
     "budget.py": {1.5, 4001, 2001, 6001, 2000.0, 80, 60},        # 1.5 = SQNR of a full-scale complex tone; grid sizes; bisection bounds
     "wavesim.py": {16, 64},                                      # the phase-noise grid's length in buffers; pulse-tail guard in chips
     "table.py": {0.75, 97, 3.0103, 1e-40, 100, 180, 34, 92},    # scan grids, -3 dB, formatting widths
-    "config.py": set(), "frontend.py": set(), "field.py": set(), "regulatory.py": set(), "fmcw_row.py": set(), "sources.py": set(), "bf.py": set(),
+    "config.py": set(), "frontend.py": set(), "field.py": set(), "regulatory.py": set(), "fmcw_row.py": set(), "sources.py": set(), "bf.py": set(), "studies.py": set(),
     "__init__.py": set(),
 }
 

@@ -1,0 +1,69 @@
+engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; the receiver's compression is a memoryless limiter, the transmitter is linear) -- no AM/PM, no memory, no spur conclusions
+sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11 holds what was checked against spec_sources' 802.11bf entries, item by item)
+
+== 1. the limiter in continuous time, and its knee (row B, L-CEF, communication limit; ROADMAP item 1) ==
+ samples a chip ahead of the ADC  mean 1/envelope   isolation for 1 dB: closed  simulated  hard-limit SNR loss    image at 40 dB: bound  simulated
+                               2           1.0266                     43.24 dB   43.44 dB              3.10 dB                 -2.1 dBc  -11.8 dBc
+                               4           1.0362                     43.28 dB   43.33 dB              3.14 dB                 -2.3 dBc  -11.6 dBc
+                               8           1.0364                     43.28 dB   43.21 dB              3.14 dB                 -2.3 dBc  -11.6 dBc
+  the first row is the table's own (the ADC's rate); the limiter (jcas60.rx_rapp_p = 2) acts on the leakage delayed by 0.176 chip
+  the knee, at 4 samples a chip (the map's floor for this target is -29.9 dBc):
+                          Rapp p   isolation for 1 dB: closed  simulated    image at 40 dB: bound  simulated    isolation for the image under the floor: closed (bound)  simulated
+                               1                     37.04 dB   37.04 dB                 -9.7 dBc  -18.7 dBc                                                   51.88 dB   47.20 dB
+                               2                     43.28 dB   43.33 dB                 -2.3 dBc  -11.6 dBc                                                   50.84 dB   48.56 dB
+                               3                     45.00 dB   45.07 dB                 -0.6 dBc  -10.1 dBc                                                   50.15 dB   48.63 dB
+
+== 2. the receiver's gain setting as a variable (rx60.radar_iwr6843_fig7_2; row B, L-CEF, communication limit; ROADMAP item 2) ==
+  the table's rows use the data sheet's typical noise figure (12 dB) with the 40 dB setting's compression point; here each setting has the noise figure of the same figure
+    gain       NF   P1dB in band  SNR, no leakage   isolation for 1 dB: compression / PN / ADC       SNR with 20 dB isolation: closed / simulated       SNR with 40 dB isolation: closed / simulated
+   30 dB  15.6 dB        -24 dBm         26.27 dB                         33.2 / 39.4 / 36.3 dB                                 5.18 /   8.65 dB                                 24.91 /  25.14 dB 
+   36 dB  12.2 dB        -30 dBm         29.67 dB                         39.2 / 42.8 / 39.7 dB                                 5.20 /   8.60 dB                                 25.57 /  25.71 dB*
+   40 dB  11.0 dB        -34 dBm         30.87 dB                         43.2 / 44.0 / 40.9 dB                                 5.21 /   8.58 dB                                 24.27 /  24.43 dB 
+   44 dB  10.5 dB        -38 dBm         31.37 dB                         47.2 / 44.5 / 41.4 dB                                 5.21 /   8.67 dB                                 23.68 /  23.92 dB 
+   48 dB  10.3 dB        -42 dBm         31.57 dB                         51.2 / 44.7 / 41.6 dB                                 5.21 /   8.70 dB*                                23.58 /  23.83 dB 
+  20 dB of isolation: the best setting (closed form, *) is 48 dB, SNR 5.21 dB -- 26.36 dB under the best setting without leakage (31.57 dB); there the echo -38.63 dB, the thermal noise -35.53 dB, the phase-noise residue +21.5 dB and the ADC +18.4 dB against it
+  40 dB of isolation: the best setting (closed form, *) is 36 dB, SNR 25.57 dB -- 6.00 dB under the best setting without leakage (31.57 dB); there the echo -4.82 dB, the thermal noise -4.08 dB, the phase-noise residue -1.1 dB and the ADC -4.2 dB against it
+  the three isolation figures are each 'at most 1 dB over the thermal floor': a noisier setting passes them more easily, which is why the SNR that is left is the figure to read
+  what the closed form adds to example 00: the limiter takes the thermal noise down more than it takes the leakage down, so the phase-noise residue and the ADC's noise, which ride on the leakage, stand higher against it than in a linear receiver
+  at 20 dB of isolation less than 10 dB of SNR is left and the roads part by 3.5 dB: the closed form over-states the ADC's noise where nothing dithers it (example 00, section 5) and the simulation's peak search reads high at that SNR; neither figure is a design point
+
+== 3. a target beyond the clean window (one packet, no noise, a target of the strength that reads 0 dB inside the window; ROADMAP items 3 and 15) ==
+  L-CEF: clean window 128 chips = 10.90 m of range, read to 120 chips
+   target at [chips]  range [m]    strongest in the window: chips road   at lag   simulation   at lag
+                  58       4.94                                 0.0 dB       58       0.0 dB       58
+                 128      10.90                              -234.8 dB        —    -234.8 dB        —
+                 160      13.63                               -39.4 dB        5     -39.4 dB        5
+                 192      16.35                               -34.6 dB       19     -34.6 dB       19
+                 256      21.80                               -18.1 dB        0     -18.1 dB        0
+                 314      26.74                               -18.1 dB       58     -18.1 dB       58
+                 384      32.70                               -20.8 dB       37     -20.8 dB       37
+                 512      43.61                               -18.1 dB        0     -18.1 dB        0
+                 640      54.51                               -22.7 dB       83     -22.7 dB       83
+                 768      65.41                               -18.1 dB        0     -18.1 dB        0
+                 826      70.35                               -18.1 dB       58     -18.1 dB       58
+    the worst of any delay past the window up to 826 chips: -18.1 dB, a target at 826 chips (70.35 m)
+  TRN field: clean window 128 chips = 10.90 m of range, read to 120 chips
+   target at [chips]  range [m]    strongest in the window: chips road   at lag   simulation   at lag
+                  58       4.94                                 0.0 dB       58       0.0 dB       58
+                 128      10.90                              -216.7 dB        —    -216.7 dB        —
+                 160      13.63                               -27.2 dB        5     -27.2 dB        5
+                 192      16.35                               -22.5 dB       19     -22.5 dB       19
+                 256      21.80                                -6.1 dB        0      -6.1 dB        0
+                 314      26.74                                -6.1 dB       58      -6.1 dB       58
+                 384      32.70                               -21.3 dB      101     -21.3 dB      101
+                 512      43.61                               -16.1 dB       81     -16.1 dB       81
+                 640      54.51                               -16.7 dB       45     -16.7 dB       45
+                 768      65.41                                -0.2 dB        0      -0.2 dB        0
+                 826      70.35                                -0.2 dB       58      -0.2 dB       58
+    the worst of any delay past the window up to 826 chips: -0.2 dB, a target at 826 chips (70.35 m)
+  a level at the arithmetic's rounding bound (example 00, section 7) is an exact cancellation: the far edge of the window is clean
+  the L-CEF has nothing ahead of its cyclic prefix here; in a packet the STF is there (its layout: spec_sources#59), so its figures past 128 chips are this model's, not a packet's
+  inside the window, the two roads (closed form on the grid against the waveform simulation):
+    L-CEF        2.0 m (  23.5 chips): closed  46.54 dB, simulated  46.57 dB, difference +0.03 dB
+    L-CEF        5.0 m (  58.7 chips): closed  29.87 dB, simulated  29.93 dB, difference +0.06 dB
+    L-CEF        8.0 m (  93.9 chips): closed  22.33 dB, simulated  22.12 dB, difference -0.21 dB
+    L-CEF       10.0 m ( 117.4 chips): closed  18.39 dB, simulated  18.63 dB, difference +0.24 dB
+    TRN field    2.0 m (  23.5 chips): closed  59.55 dB, simulated  59.57 dB, difference +0.02 dB
+    TRN field    5.0 m (  58.7 chips): closed  42.88 dB, simulated  42.85 dB, difference -0.03 dB
+    TRN field    8.0 m (  93.9 chips): closed  35.34 dB, simulated  35.43 dB, difference +0.09 dB
+    TRN field   10.0 m ( 117.4 chips): closed  31.40 dB, simulated  31.49 dB, difference +0.09 dB

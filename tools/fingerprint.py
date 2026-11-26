@@ -110,6 +110,12 @@ def record() -> dict:
     _flat("budget.pn_residual_shared", budget.pn_residual_shared(s, s.leak_delay_s.value), out)
     _flat("budget.pn_residual_independent", budget.pn_residual_independent(s, s.field.n_correlated / s.chip_rate_hz.value), out)
     _flat("budget.snr_required_db", t["snr_required_db"], out)
+    # the studies beside the table (ROADMAP items; example 01)
+    from jcas60 import studies
+    st = studies.build()
+    for k in ("limiter", "gains", "beyond"):
+        _flat(f"studies.{k}", st[k], out)
+    _flat("studies.text", hashlib.sha256(studies.render(st).encode()).hexdigest(), out)
     return out
 
 
