@@ -116,6 +116,12 @@ def record() -> dict:
     for k in sorted(k for k in st if k != "setup"):
         _flat(f"studies.{k}", st[k], out)
     _flat("studies.text", hashlib.sha256(studies.render(st).encode()).hexdigest(), out)
+    # the transmit array (milestone 1; example 02)
+    from jcas60 import arrays
+    ar = arrays.build()
+    for k in sorted(k for k in ar if k != "setup"):
+        _flat(f"arrays.{k}", ar[k], out)
+    _flat("arrays.text", hashlib.sha256(arrays.render(ar).encode()).hexdigest(), out)
     return out
 
 

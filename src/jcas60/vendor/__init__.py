@@ -36,7 +36,15 @@ Pins
     printed: the ay_sc row's rate is read from it),
   - ``data/clock_profiles/pllsim_wu19_x10_60p48g_floor150.yaml`` (its x10 LO's
     phase-noise profile: the one fmcw_radar's ``radar_60g_x10lo.yaml`` reads,
-    for the study that gives every row that LO; the table's rows do not use it).
+    for the study that gives every row that LO; the table's rows do not use it),
+  - ``arraytx/geometry.py``, ``arraytx/beam.py`` (array_tx's array geometry and
+    beam functions as mmw60_trx vendors them, at array_tx @ ``286609e``: their
+    headers keep both attributions; numpy only, and each other.  The transmit
+    array of ``jcas60.arrays`` is built on them: the geometry, the array factor,
+    the element-by-element steering and the far-field sum).
+
+  mmw60_trx's own array link (``arraylink.py``, ``frontend/array60.py``) is NOT
+  copied: it stands on ``Frontend60`` and the whole of wifitrx.
 
   ``ay/training.py`` is NOT copied: it builds the OFDM-rate EDMG-STF / EDMG-CEF,
   and it imports mmw60's ``spec`` shim (its local table plus a second, older

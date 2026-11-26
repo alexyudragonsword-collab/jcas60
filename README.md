@@ -8,6 +8,7 @@
 pip install -e ".[test]"
 python examples/00_comparison_table.py     # 对照表，约 70 s
 python examples/01_receiver_and_window.py  # 表引出的十一个问题：限幅器、增益档、窗外的目标、快目标、粗 ADC、泄漏的时延、同一个本振、双站的频偏、距离窗、第二个目标、为感知设计的 TRN 波形，约 145 s
+python examples/02_transmit_array.py       # 里程碑 1 第一步：N 个发射单元——EIRP 与回退、波束与方向数、扫一遍的空口时间、波束偏斜、单站的泄漏，约 45 s
 pytest && ruff check src tests tools examples
 ```
 

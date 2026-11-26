@@ -15,7 +15,7 @@ PINS = {"spec_sources": "3a6e1905ef7c48c01338cf9cd808e3fd4bdad8a7", "mmw60_trx":
 
 def test_every_vendored_file_names_its_upstream_at_a_full_sha():
     files = V.vendored_files()
-    assert len(files) == 18
+    assert len(files) == 20
     for f in files:
         m = V.HEADER.match(f.read_text(encoding="utf-8").splitlines()[0])
         assert m, f
@@ -54,7 +54,13 @@ def test_only_what_is_read_is_vendored():
     pre = (V.VENDOR / "mmw60/ay/preamble.py").read_text(encoding="utf-8")
     imports = [ln for ln in pre.splitlines() if ln.startswith(("import ", "from "))]
     assert imports == ["from __future__ import annotations", "import numpy as np", "from .golay import golay_pair"]
+    # arraytx's two files import numpy and each other, nothing of mmw60_trx's own array link (which stands on Frontend60)
+    for name, want in (("geometry.py", ["from __future__ import annotations", "from dataclasses import dataclass, replace", "import numpy as np"]),
+                       ("beam.py", ["from __future__ import annotations", "import numpy as np", "from .geometry import C0, ArrayGeometry"])):
+        text = (V.VENDOR / "mmw60/arraytx" / name).read_text(encoding="utf-8")
+        assert [ln for ln in text.splitlines() if ln.startswith(("import ", "from "))] == want, name
+    assert not [n for n in names if "arraylink" in n or "array60" in n]
     used = (REPO / "src/jcas60").glob("*.py")
     text = "\n".join(p.read_text(encoding="utf-8") for p in used)
-    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble"):
+    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble", "arraytx import beam", "arraytx import geometry"):
         assert mod in text, mod
