@@ -16,7 +16,7 @@
 1. 先读本文件。
 2. 读根目录 `ROADMAP.md`：只记没做的，每条附证据（复现方式与数字），含“报回上游”节。
 3. 读 `cairn/LOG.md` 最新几条（新条目在顶部）：每轮的数字原值与被推翻的判断。
-4. 按任务读 `cairn/comparison-table.md`（三个问题的结论，先结论后前提；感知帧对 802.11bf 条目的逐项核对）、`cairn/architecture-invariants.md`（铁律 ↔ 实现 ↔ 测试）。
+4. 按任务读 `cairn/comparison-table.md`（三个问题的结论，先结论后前提；感知帧对 802.11bf 条目的逐项核对）、`cairn/transmit-array.md`（里程碑 1：发射阵列）、`cairn/architecture-invariants.md`（铁律 ↔ 实现 ↔ 测试）。
 
 ## 文档职责
 

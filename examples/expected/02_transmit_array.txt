@@ -1,0 +1,56 @@
+engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; the receiver's compression is a memoryless limiter, the transmitter is linear) -- no AM/PM, no memory, no spur conclusions
+sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11 holds what was checked against spec_sources' 802.11bf entries, item by item)
+
+== 1. a transmit array of N elements (line, 0.5 lambda apart, cos element pattern, phase steering; one receive antenna; one element radiates 22 dBm EIRP at full power) ==
+   N   full EIRP       communication limit: EIRP, back-off, SNR L-CEF / TRN               radar limit: EIRP, back-off, SNR L-CEF / TRN
+   1   22.00 dBm                  22.00 dBm   0.00 dB    30.74 / 43.75 dB                  20.00 dBm   2.00 dB    28.74 / 41.75 dB
+   2   28.02 dBm                  28.02 dBm   0.00 dB    36.76 / 49.77 dB                  20.00 dBm   8.02 dB    28.74 / 41.75 dB
+   4   34.04 dBm                  34.04 dBm   0.00 dB    42.78 / 55.79 dB                  20.00 dBm  14.04 dB    28.74 / 41.75 dB
+   8   40.06 dBm                  40.00 dBm   0.06 dB    48.74 / 61.75 dB                  20.00 dBm  20.06 dB    28.74 / 41.75 dB
+  16   46.08 dBm                  40.00 dBm   6.08 dB    48.74 / 61.75 dB                  20.00 dBm  26.08 dB    28.74 / 41.75 dB
+  SNR(cell) of row B at 5 m, closed form; the receiver is one antenna, so the array's gain is on the way out only
+
+== 2. the beam, and how many of them cover +-60 deg (adjacent beams crossing at -3 dB) ==
+   N   -3 dB width on boresight: closed    arraytx   beams: closed   arraytx   placed   loss at the edge of view        air time of a sweep, 30 sweeps/s: L-CEF / TRN    sweeps/s at one beam’s air time
+   1                                  —          —            1.00      1.00        1                    6.02 dB                                      1.16 / 4.51 %                        30.00
+   2                          50.76 deg  59.93 deg            1.96      1.73        2                    6.02 dB                                      2.32 / 9.03 %                        15.00
+   4                          25.38 deg  26.31 deg            3.91      3.81        4                    6.02 dB                                      4.65 / 18.05 %                         7.50
+   8                          12.69 deg  12.79 deg            7.82      7.77        8                    6.02 dB                                      9.30 / 36.11 %                         3.75
+  16                           6.34 deg   6.36 deg           15.64     15.62       16                    6.02 dB                                     18.60 / 72.22 %                         1.88
+  closed: 0.886 lambda / (N d) wide, 2 sin(fov) N d / (0.886 lambda) of them; arraytx: the same from its array factor's own width; placed: evenly in sin(theta), one width apart, centred
+  the loss at the edge of view is the element's pattern, one way; a sweep sends one sensing frame per beam (air time under the communication limit)
+  closed is the continuous aperture's width: the array's own is wider at small N (two elements: 60 deg, not 50.8)
+
+== 3. phase steering over the occupied band: the squint (N = 16; the band's edge points 1.80 deg off at the edge of view) ==
+       field   steered to   steering    peak lost: closed   waveform
+       L-CEF     30.0 deg      phase            0.0166 dB  0.0166 dB
+       L-CEF     30.0 deg        ttd            0.0000 dB  0.0000 dB
+       L-CEF     60.0 deg      phase            0.0499 dB  0.0499 dB
+       L-CEF     60.0 deg        ttd            0.0000 dB  0.0000 dB
+   TRN field     30.0 deg      phase            0.0166 dB  0.0166 dB
+   TRN field     30.0 deg        ttd            0.0000 dB  0.0000 dB
+   TRN field     60.0 deg      phase            0.0499 dB  0.0499 dB
+   TRN field     60.0 deg        ttd            0.0000 dB  0.0000 dB
+  closed: the raised-cosine spectrum weighted by the steering's response in the beam's direction; waveform: the field driven element by element and summed in the far field
+
+== 4. the link on the two roads at the array that reaches the communication limit (no leakage) ==
+  L-CEF      N = 8, communication limit, EIRP 40.00 dBm: closed on the grid 47.87 dB, simulated 47.91 dB, difference +0.04 dB
+  TRN field  N = 8, communication limit, EIRP 40.00 dBm: closed on the grid 60.88 dB, simulated 60.89 dB, difference +0.01 dB
+
+== 5. the monostatic row: N power amplifiers beside the receiver (each element leaks at the isolation one antenna has; antenna arrays with EBG: 40 dB) ==
+   N                  limit       EIRP  SNR, no leakage   sum of powers: leakage, isolation needed, short by, SNR left    all in phase: leakage, isolation needed, short by, SNR left
+   1    communication limit  22.00 dBm         29.87 dB                 -28.00 dBm    43.24 dB   +3.24 dB    23.88 dB                 -28.00 dBm    43.24 dB   +3.24 dB    23.88 dB
+   1            radar limit  20.00 dBm         27.87 dB                 -30.00 dBm    41.24 dB   +1.24 dB    23.73 dB                 -30.00 dBm    41.24 dB   +1.24 dB    23.73 dB
+   2    communication limit  28.02 dBm         35.89 dB                 -24.99 dBm    46.25 dB   +6.25 dB    27.23 dB                 -21.98 dBm    49.26 dB   +9.26 dB    24.61 dB
+   2            radar limit  20.00 dBm         27.87 dB                 -33.01 dBm    38.23 dB   -1.77 dB    26.08 dB                 -30.00 dBm    41.24 dB   +1.24 dB    23.73 dB
+   4    communication limit  34.04 dBm         41.91 dB                 -21.98 dBm    49.26 dB   +9.26 dB    30.63 dB                 -15.96 dBm    55.28 dB  +15.28 dB    25.05 dB
+   4            radar limit  20.00 dBm         27.87 dB                 -36.02 dBm    35.22 dB   -4.78 dB    27.22 dB                 -30.00 dBm    41.24 dB   +1.24 dB    23.73 dB
+   8    communication limit  40.00 dBm         47.87 dB                 -19.03 dBm    52.21 dB  +12.21 dB    33.92 dB                 -10.00 dBm    61.24 dB  +21.24 dB    25.19 dB
+   8            radar limit  20.00 dBm         27.87 dB                 -39.03 dBm    32.21 dB   -7.79 dB    27.60 dB                 -30.00 dBm    41.24 dB   +1.24 dB    23.73 dB
+  16    communication limit  40.00 dBm         47.87 dB                 -22.04 dBm    49.20 dB   +9.20 dB    36.64 dB                 -10.00 dBm    61.24 dB  +21.24 dB    25.19 dB
+  16            radar limit  20.00 dBm         27.87 dB                 -42.04 dBm    29.20 dB  -10.80 dB    27.74 dB                 -30.00 dBm    41.24 dB   +1.24 dB    23.73 dB
+  row B (L-CEF) at 5 m, SNR on the grid, closed form with the limiter, the LO's phase noise and the ADC at once; what binds the isolation everywhere: in-band compression
+  the N leakages are one waveform N times: they add as phasors, anywhere from nothing to all in phase, and the phases move with the beam; this library has no model of them
+  both roads at N = 8, communication limit, EIRP 40.00 dBm, with the limiter, the LO's phase noise and the ADC on (no leakage: closed 47.87 dB, simulated 47.91 dB):
+    sum of powers  leakage  -19.03 dBm: closed 33.92 dB, simulated 33.77 dB, difference -0.15 dB (closed: echo -19.58 dB, phase noise +8.78 dB and ADC +5.67 dB against the thermal floor)
+    all in phase   leakage  -10.00 dBm: closed 25.19 dB, simulated 25.17 dB, difference -0.01 dB (closed: echo -28.63 dB, phase noise +17.81 dB and ADC +14.70 dB against the thermal floor)

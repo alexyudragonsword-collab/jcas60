@@ -167,3 +167,10 @@ entries:
     source: assumed
     cite: "本库；条目 ieee80211bf.dmg_monostatic_ppdu 允许单站在 TRN 场里放满足四个条件的任意波形；序列是 dmg.golay_sequences 的 Ga128 / Gb128"
     note: "为感知设计的 TRN 场波形（示例 01 §11）：整场 Ga128 / Gb128 交替，符号以 8 段为周期。偶数段的符号 [+ + + −] 是长 4 的完美二元序列（周期自相关在非零移位上为零），奇数段的符号是它移 2 位 [+ − + +]：相邻段的互相关按符号抵消，所以每一段都能相关；时延差在 clean_blocks 段（256 码片）以内旁瓣严格为零——干净区是标准子字段的两倍（示例 01 §11 用码片的相关核过，两侧都是）。两端各留 guard_blocks 段不相关：被相关的是整 29 个周期，两头各 4 段当保护（少于整周期时相邻段的互相关抵不干净，保护取 1 段时旁瓣从舍入界升到 −58 dB）。场长与标准 TRN 场相同（jcas60.trn_sensing 的单元数）。换了会动什么：换成别的符号图样，干净区缩回一段或窗外重新出离散的假峰（标准子字段在多出 2 段处是 −6.1 dB）；周期取 8 段时整个折回在 1024 码片 = 87.2 m。"
+
+  jcas60.array:
+    value: {tx_elements: [1, 2, 4, 8, 16], spacing_lambda: 0.5, element_pattern: "cos", steering: "phase", field_of_view_deg: 60, crossover_db: 3, rx_elements: 1, squint_elements: 16, simulated_elements: 8}
+    unit: "-, 波长, text, text, 度, dB, -, -, -"
+    source: assumed
+    cite: "本库；阵列的几何与阵因子是 arraytx 的 geometry / beam（经 mmw60_trx vendor）"
+    note: "里程碑 1 第一步的发射阵列（jcas60.arrays，示例 02）：均匀直线阵，间距半波长，每个单元一个与单天线时相同的 PA 与相同增益的单元天线（jcas60.antenna_gain_dbi 的发射那一项当作单元增益），单元方向图取 arraytx 的 cos；相位扫描（不是真时延）；接收仍是一根天线。视场取 ±60°，相邻波束在 −3 dB 处相交（指半功率 3.01 dB，arraytx 的波束宽度就是这个电平；波束按 sin θ 等间隔、居中摆）。squint_elements / simulated_elements：波束偏斜与波形级的那条路各在几个单元上量。换了会动什么：单元数每 ×2，满功率 EIRP +6 dB、波束窄一半、要扫的方向数 ×2；间距大于半波长在 ±60° 内出栅瓣；视场取小方向数按 sin 比例少；接收也用阵列时 SNR 再 +10·log10(N)，这里没有算。单站的泄漏：每个单元到接收天线的隔离都取单天线的那个数；相位扫描下 N 路泄漏是同一个波形，按相量相加，相位没有模型，给两个界（功率相加、全部同相），同相那个界就是表里原来的式子；隔离随单元远近变、相位随波束指向变，都没有建模，换了示例 02 §5 的每个数都动。10 dBi 的单元增益与半波长的间距并不自洽（10 dBi 的口径比半波长大），这是两头借数的结果，单元天线没有建模。"
