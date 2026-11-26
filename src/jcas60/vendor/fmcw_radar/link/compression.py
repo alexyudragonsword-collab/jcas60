@@ -1,4 +1,4 @@
-# Vendored from fmcw_radar@c303566180c2ef22bd2bf6ffaa1f08e59174e110: src/fmcw_radar/link/compression.py
+# Vendored from fmcw_radar@d1c48bd972fabc693517a30d976ac85feda3739c: src/fmcw_radar/link/compression.py
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 """Receiver compression: one memoryless envelope limiter per stage (ROADMAP P1 #4).
 

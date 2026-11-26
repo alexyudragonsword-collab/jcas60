@@ -51,13 +51,18 @@ Pins
   copy of spec_sources).  ``Frontend60`` is not copied either (milestone 0's
   boundary: the same numbers, not the same object).
 
-* ``fmcw_radar/`` -- fmcw_radar @ ``c303566180c2ef22bd2bf6ffaa1f08e59174e110`` (0.2.33):
+* ``fmcw_radar/`` -- fmcw_radar @ ``d1c48bd972fabc693517a30d976ac85feda3739c`` (0.2.34):
 
   - ``processing/detection.py``, ``processing/cfar.py``,
     ``processing/windows.py`` (verbatim),
-  - ``processing/rd.py`` (adapted: one import line -- ``C0`` comes from this
-    package's ``__init__`` instead of fmcw_radar's config schema, which is not
-    copied; the ``RadarConfig`` name it also imported is an annotation only),
+  - ``processing/rd.py`` (verbatim since fmcw_radar#44: nothing of its config
+    layer is imported when it loads; this library calls ``doppler_fft``,
+    ``power_db``, ``read_peak`` and ``noise_floor``, none of which takes a
+    config),
+  - ``processing/cfarstats.py`` (verbatim, new with fmcw_radar#44: what a
+    map's windows and zero-padding do to a CA-CFAR -- the SNR a steady target
+    needs for a given Pd on that map.  Imports ``detection``, ``cfar`` and
+    ``windows`` beside it, numpy and scipy),
   - ``link/compliance.py`` (verbatim since fmcw_radar#42: nothing of
     fmcw_radar is imported when it loads; this library calls its
     ``check_emission`` with ``jcas60.sources.fcc_number`` as the function
@@ -74,8 +79,7 @@ Pins
 
 Local changes
 -------------
-None in any body: the one import line of ``processing/rd.py`` is the adapted
-copy's whole difference, which ``tools/vendor_check.py`` classifies as such.
-A change to a vendored body goes upstream first (an issue there), then is
+None: every file is verbatim (``tools/vendor_check.py --strict``: 21 files,
+21 verbatim).  A change to a vendored body goes upstream first (an issue there), then is
 re-vendored at a new pin.
 """

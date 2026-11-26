@@ -351,7 +351,7 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   tgad_em.pn_params#f_pole_hz                                                     1e+06 [spec]
   tgad_em.pn_params#f_zero_hz                                                     1e+08 [spec]
   tgad_em.pn_params#psd0_dbchz                                                      -90 [spec]
-  row A: fmcw_radar@c303566 `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
+  row A: fmcw_radar@d1c48bd `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
 
 == 11. the ay sensing frame against spec_sources' 802.11bf entries, item by item (law 7; the entries are from the task groups' public documents) ==
   B     who transmits and who receives         fits                     here: one device transmits the packet and correlates its own echo

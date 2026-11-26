@@ -1,4 +1,4 @@
-# Vendored from fmcw_radar@c303566180c2ef22bd2bf6ffaa1f08e59174e110: src/fmcw_radar/processing/windows.py
+# Vendored from fmcw_radar@d1c48bd972fabc693517a30d976ac85feda3739c: src/fmcw_radar/processing/windows.py
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 """Window functions and what they do to a tone: coherent gain, noise
 bandwidth, mainlobe width (the numbers the resolution table rests on).

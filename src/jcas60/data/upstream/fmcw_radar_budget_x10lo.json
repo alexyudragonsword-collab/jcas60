@@ -3,7 +3,7 @@
   "command": "python tools/budget_report.py configs/radar_60g_x10lo.yaml --json <out>",
   "config": "configs/radar_60g_x10lo.yaml",
   "repo": "fmcw_radar",
-  "sha": "c303566180c2ef22bd2bf6ffaa1f08e59174e110"
+  "sha": "d1c48bd972fabc693517a30d976ac85feda3739c"
  },
  "report": {
   "angle": {},

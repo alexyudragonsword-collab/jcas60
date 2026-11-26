@@ -12,7 +12,7 @@ authoring_mode: ai_generated
 
 # 对照表：FMCW 对“用 ay 波形做感知”
 
-数字出自 `examples/expected/00_comparison_table.txt`（`python examples/00_comparison_table.py` 重出，约 70 s；下文的 §n 指它的第 n 节）。目标：5 m 处远离的人体，2 m/s，RCS −10 dBsm。各行共用一套前端数字（发 12 dBm、收发天线各 10 dBi、NF 12 dB），A 行是 fmcw_radar@`c303566` 默认配置的报告原样。ay 的行有两种感知场：**L-CEF**（每个包相关 1024 码片）与 **TRN 场**（同一个包后面接 4 个单元的 EDMG TRN-R 场，每个包相关 20 480 码片）。本库的说法是“用 ay 波形做感知”，不说“符合 802.11bf”（铁律 7）；感知帧对 802.11bf 条目的逐项核对在文末一节。
+数字出自 `examples/expected/00_comparison_table.txt`（`python examples/00_comparison_table.py` 重出，约 70 s；下文的 §n 指它的第 n 节）。目标：5 m 处远离的人体，2 m/s，RCS −10 dBsm。各行共用一套前端数字（发 12 dBm、收发天线各 10 dBi、NF 12 dB），A 行是 fmcw_radar@`d1c48bd` 默认配置的报告原样。ay 的行有两种感知场：**L-CEF**（每个包相关 1024 码片）与 **TRN 场**（同一个包后面接 4 个单元的 EDMG TRN-R 场，每个包相关 20 480 码片）。本库的说法是“用 ay 波形做感知”，不说“符合 802.11bf”（铁律 7）；感知帧对 802.11bf 条目的逐项核对在文末一节。
 
 ## 问题 1：分辨率和探测距离，通信波形能不能赢过 FMCW？
 

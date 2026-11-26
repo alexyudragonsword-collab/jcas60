@@ -2230,7 +2230,7 @@
 "table.sensitivity[4][1]": "-16.7",
 "table.sensitivity[4][2]": "14.043099546358658",
 "table.sensitivity[4][3]": "'antennas -16.0 dB, NF +5.9 dB, TX power -6.6 dB; row A is not recomputed on them'",
-"table.text": "'63ece058965fb36e4900afa7a9e8a172792fc11fa93fb4e26e785ba8798761be'",
+"table.text": "'677b4086183442187d5fdb658371ac1a9dd3387719a1d65a0b62656c85469745'",
 "table.trn_sweep[0][0]": "1",
 "table.trn_sweep[0][1]": "5120",
 "table.trn_sweep[0][2]": "37.732799589718844",
