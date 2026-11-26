@@ -224,7 +224,7 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   dmg.cef_golay_layout#sc_order                                                         [spec]
   dmg.golay_sequences#ga128                                                             [spec]
   dmg.golay_sequences#gb128                                                             [spec]
-  dmg.phy_timing#brpifs_s                                                         2e-05 [spec]
+  dmg.phy_timing#brpifs_s                                                       4.4e-05 [spec]
   dmg.phy_timing#sifs_s                                                           3e-06 [spec]
   edmg.sc_params#chip_rate_hz                                                  1.76e+09 [spec]
   edmg.sc_siso_preamble#edmg_header_a_chips                                        1024 [spec]
@@ -391,7 +391,7 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): BRP-RX/TX / BRP-TX / BRP-RX PPDU with a TRN field; Sync field: none
   C     the PPDU, with the TRN field           does not fit             here: a TRN-R field behind the packet and no Sync field, as a BRP-RX PPDU has -- but no data field, so no BRP frame is in it
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): BRP-RX/TX / BRP-TX / BRP-RX PPDU with a TRN field; Sync field: none
-  C     the exchange                           does not fit             here: 64 packets one way; no BRP frame comes back, no BRPIFS (20 us) and no feedback are in the air time of section 6
+  C     the exchange                           does not fit             here: 64 packets one way; no BRP frame comes back, no BRPIFS (44 us) and no feedback are in the air time of section 6
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): one or more BRP frames with TRN field from the initiator, then after BRPIFS a BRP frame from the responder; feedback: BRP Response frame; may be delayed or aggregated
   C     the PHY mode                           fits                     here: SC
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): control or SC mode
