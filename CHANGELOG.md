@@ -4,6 +4,14 @@
 
 ## 未发布
 
+### 重新 pin spec_sources@da54721（spec_sources#59）：膝部有了出处、TRN_BL = 256、按条目帧序的双站（2026-11-26）
+- **对照表的行与数没有动**（只换 pin 的那次提交：BRPIFS 20 → 44 µs 只进 §11 的一句话）。示例 01 多了 §12–14（现在约 170 s）。
+- §12（`studies.measured_knee`）：两条实测 60 GHz 压缩曲线拟合 Rapp，p = 0.898 / 1.618，都比占位的 2 缓；换上后压缩判据 35.45 / 41.93 dB，最紧的一条换成相噪 42.98 dB。表里的 p 没换（与 fmcw_radar 的占位相同）。
+- §13（`studies.long_trn`，`field.trn(..., "long")`）：TRN_BL = 256、2 个单元——场长、空口时间、SNR 不变，干净区 10.90 → 21.80 m，假峰挪到多出 512 码片处。`field.tabulated` / `from_recursion` 认长 256 / 512 的对。
+- §14（`studies.bistatic_exchange`，只有闭式）：BRP 帧的数据域至少 18 块、SIFS / BRPIFS 的帧序——空口 4.51 → 5.67 %（速度分辨 0.39 → 1.35 m/s）或占着信道 15.00 %。
+- §11 两项的措辞带上条目的新字段；仍是 13 对得上、4 没有定、3 对不上。指纹新增 197 个值，共 2529 个；原有的只动两个文本哈希。
+- ROADMAP：第 1、2、8、11、13 条改写；“报回上游”里 spec_sources 一节清成 #59 没查到的那几件。
+
 ### 重新 pin fmcw_radar@d1c48bd（0.2.34，fmcw_radar#44）：A 行的泄漏有数了；ay 各行用自己图上的 CFAR 门限（2026-11-26）
 - **对照表的数动了**：ay 各行 Pd 0.9 的距离远 2.4–2.5 %（L-CEF 14.28 → 14.63 m，TRN 29.41 → 30.12 m，雷达读法 26.35 → 26.99 m）。此前借的是 A 行图上的门限 12.24 dB；ay 自己的图上是 11.81 dB（`budget.cfar_snr_required`，用 vendored 的 `cfarstats`）。A 行不动。
 - 第二条路（`table.cfar_check`，`jcas60.cfar_monte_carlo`）：同形的噪声图上真跑 CA-CFAR，虚警率 1.116e-4 ± 0.05e-4 对闭式 1.091e-4，Pd 0.9003 ± 0.0037。

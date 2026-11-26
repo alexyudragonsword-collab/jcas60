@@ -98,10 +98,12 @@ def checks(s: Setup) -> list[dict]:
          "here": "the plain SC packet of row B, which has no TRN field", "verdict": DIFFERS},
         {"row": "C", "item": "the PPDU, with the TRN field", "key": BI,
          "entry": f"{bi_ppdu} PPDU with a TRN field; Sync field: {S.raw(BI + '#sync_field')}",
-         "here": "a TRN-R field behind the packet and no Sync field, as a BRP-RX PPDU has -- but no data field, so no BRP frame is in it", "verdict": DIFFERS},
+         "here": "a TRN-R field behind the packet and no Sync field, as a BRP-RX PPDU has -- but no data field, so no BRP frame is in it "
+                 f"(a BRP frame's SC packet carries at least {S.num(BI + '#min_data_sc_blocks').value:g} SC blocks)", "verdict": DIFFERS},
         {"row": "C", "item": "the exchange", "key": BI,
-         "entry": f"{S.raw(BI + '#tx_initiator')}; feedback: {S.raw(BI + '#feedback')}",
-         "here": f"{n} packets one way; no BRP frame comes back, no BRPIFS ({brpifs_us:g} us) and no feedback are in the air time of section 6", "verdict": DIFFERS},
+         "entry": f"{S.raw(BI + '#tx_initiator')}; {S.raw(BI + '#spacing')}; feedback: {S.raw(BI + '#feedback')}",
+         "here": f"{n} packets one way; no BRP frame comes back, no BRPIFS ({brpifs_us:g} us) and no feedback are in the air time of section 6 "
+                 "(example 01 section 14 prices the exchange)", "verdict": DIFFERS},
         {"row": "C", "item": "the PHY mode", "key": BI,
          "entry": f"{' or '.join(S.raw(BI + '#phy_modes'))} mode",
          "here": "SC", "verdict": FITS if "SC" in S.raw(BI + "#phy_modes") else DIFFERS},

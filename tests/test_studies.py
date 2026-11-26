@@ -300,3 +300,86 @@ def test_the_designed_pattern_is_built_on_the_perfect_sequence():
     acf = lambda x, m: int(np.sum(x * np.roll(x, m)))                              # noqa: E731
     assert [acf(e, m) for m in range(4)] == [4, 0, 0, 0] and [acf(o, m) for m in range(4)] == [4, 0, 0, 0]
     assert int(np.sum(e * o)) == 0 and int(np.sum(e * np.roll(o, 1))) == 0
+
+
+# ----------------------------------------------------------------------------- 12. the knee from measured curves
+def test_both_measured_curves_bend_more_gently_than_the_placeholder(st):
+    """spec_sources#59: two 60 GHz compression curves.  The Rapp model fits each within its reading error, and both
+    knees are under fmcw_radar's placeholder of 2; one point 3 dB over P1dB (the other road) says the same."""
+    kn = st["knee"]
+    amp, rx = kn["rows"]
+    assert (amp["points"], rx["points"]) == (16, 11) and kn["placeholder"]["p"] == 2.0
+    assert amp["fixed"]["p"] == pytest.approx(0.898, abs=2e-3) and rx["fixed"]["p"] == pytest.approx(1.618, abs=2e-3)
+    assert amp["fixed"]["rms_db"] < 0.02 and rx["fixed"]["rms_db"] < 0.1                  # the figures were read to +-0.02 and +-0.1 dB
+    for r in kn["rows"]:
+        assert r["fixed"]["p"] < kn["placeholder"]["p"] and r["p_one_point"] < kn["placeholder"]["p"] and r["free"]["p"] < kn["placeholder"]["p"]
+        assert abs(r["p_one_point"] - r["fixed"]["p"]) < 0.15 and abs(r["free"]["ip1db_dbm"] - r["ip1db_dbm"]) < 1.0
+        assert r["free"]["rms_db"] <= r["fixed"]["rms_db"] + 1e-9 and r["compression_over_db"] < kn["placeholder"]["compression_over_db"]
+    assert (amp["compression_over_db"], rx["compression_over_db"]) == (pytest.approx(1.69, abs=0.006), pytest.approx(2.22, abs=0.006))
+    assert kn["placeholder"]["compression_over_db"] == pytest.approx(2.61, abs=0.006)
+
+
+def test_law4_a_gentler_knee_hands_the_binding_criterion_to_the_phase_noise(st):
+    kn = st["knee"]
+    ph = kn["placeholder"]
+    assert ph["binding"] == "in-band compression" and ph["need_db"] == pytest.approx(43.24, abs=0.006)
+    for r, want in zip(kn["rows"], (35.45, 41.93)):
+        q = r["roads"]
+        assert q["need_closed_db"] == pytest.approx(want, abs=0.006) and abs(q["need_sim_db"] - q["need_closed_db"]) < 0.3      # law 4
+        assert r["binding"] == "LO phase noise on the leakage" and r["need_db"] == ph["need_pn_db"] == pytest.approx(42.98, abs=0.006)
+        assert q["ghost_sim_db"] < q["ghost_closed_db"] and q["ghost_sim_db"] > kn["isolation_best_db"]     # the bound; and 40 dB still shows the ghost
+    assert kn["chip2"]["isolation_db"] == 50.0 and kn["chip2"]["spare_db"] == pytest.approx(6.76, abs=0.006)
+
+
+def test_the_table_keeps_the_knee_fmcw_radar_has(st):
+    """Law 2: the fitted knees are a study.  Row A's leakage was computed by fmcw_radar with its own knee; the table's
+    rows keep the same one."""
+    from jcas60 import sources as S
+    assert st["setup"].rx_rapp_p.value == S.num("jcas60.rx_rapp_p").value == 2.0
+
+
+# ----------------------------------------------------------------------------- 13. the long TRN subfield
+def test_the_long_golay_pair_is_its_recursion_and_complementary(st):
+    import numpy as np
+
+    from jcas60 import field as F
+    pair = st["long_trn"]["pair"]
+    assert pair == {"length": 256, "recursion_equals_table": True, "acf_peak": 512.0, "acf_worst_sidelobe": 0.0}
+    for n in (256, 512):
+        ga, gb = F.tabulated(f"ga{n}"), F.tabulated(f"gb{n}")
+        ra, rb = F.from_recursion(n)
+        assert np.array_equal(ga, ra) and np.array_equal(gb, rb) and set(np.unique(ga)) == {-1.0, 1.0}
+    assert np.array_equal(F.from_recursion(128)[0], F.tabulated("ga128"))                # the DMG pair is still found where it was
+
+
+def test_law4_the_long_subfield_doubles_the_window_at_the_same_length_and_snr(st):
+    lt = st["long_trn"]
+    std, new = lt["rows"]
+    assert lt["units"] == 2 and new["field_chips"] == std["field_chips"] == 30720 and new["correlated_chips"] == std["correlated_chips"] == 20480
+    assert new["clean_chips"] == 2 * std["clean_chips"] == 256 and new["snr_cell_db"] == std["snr_cell_db"] and new["range_snr_m"] == std["range_snr_m"]
+    for r in lt["rows"]:
+        assert abs(r["snr_sim_db"] - r["snr_grid_db"]) < 0.3 and r["sidelobe_rest_dbc"] < -200.0
+    assert new["sidelobe_moving_dbc"] - std["sidelobe_moving_dbc"] == pytest.approx(4.19, abs=0.05)       # expected 6 dB: see the log
+    by = {r["delay_chips"]: r for r in lt["beyond"]}
+    for r in lt["beyond"]:                                                               # the chips and the waveform, lag by lag
+        assert abs(db(r["level_sim"]) - db(r["level_closed"])) < 0.01
+    assert by[256]["lag_closed"] is None and db(by[256]["level_closed"]) < -200.0        # clean to the window's edge
+    assert by[512]["level_closed"] == pytest.approx((39 / 80) ** 2) and by[512]["lag_closed"] == 0       # the ghost, twice as far as section 3's
+    assert by[1536]["level_closed"] == pytest.approx((19 / 20) ** 2) and lt["subfield_chips"] == 1536    # folds back whole
+    assert max(db(by[d]["level_closed"]) for d in (314, 384, 768, 1024, 1280)) < -17.0
+
+
+# ----------------------------------------------------------------------------- 14. the bistatic exchange
+def test_the_entrys_exchange_costs_air_time_or_velocity_resolution(st):
+    """Closed form only.  One exchange a frame keeps the air time near the table's but fixes the packet interval at
+    the packet's length; one exchange a packet keeps the Doppler axis and holds the medium three times as long."""
+    ex = st["exchange"]
+    a, b, tb = ex["one_exchange_a_frame"], ex["one_exchange_a_packet"], ex["table"]
+    assert (ex["data_blocks"], ex["data_chips"], ex["body_octets"]) == (18, 9280.0, 33)
+    assert ex["sounding_s"] - ex["sounding_now_s"] == pytest.approx(ex["data_s"]) == pytest.approx(5.2727e-6, rel=1e-4)
+    assert (ex["sifs_s"], ex["brpifs_s"]) == (3e-6, 4.4e-5)
+    assert ex["air_now"] == pytest.approx(0.0451, abs=5e-5) and a["air"] == pytest.approx(0.0567, abs=5e-5) and b["air"] == pytest.approx(0.1500, abs=5e-5)
+    assert a["air_min"] < a["air"] and a["frame_s"] == pytest.approx(64 * ex["sounding_s"] + 63 * ex["sifs_s"] + ex["brpifs_s"] + ex["reply_s"])
+    assert a["interval_s"] == pytest.approx(ex["sounding_s"] + ex["sifs_s"]) and a["velocity_res_mps"] / tb["velocity_res_mps"] == pytest.approx(tb["interval_s"] / a["interval_s"])
+    assert a["velocity_res_mps"] == pytest.approx(1.345, abs=1e-3) and a["velocity_max_mps"] == pytest.approx(43.06, abs=0.01)
+    assert b["fits_the_interval"] and b["velocity_res_mps"] == tb["velocity_res_mps"] and b["air_emitted"] == pytest.approx(0.0655, abs=5e-5)

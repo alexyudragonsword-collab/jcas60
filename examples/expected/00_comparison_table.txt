@@ -208,7 +208,7 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   jcas60.radar_reading_airtime     {'lower': '关断时间只管感知的发射：与按通信限值读时同一个占比', 'upper': '关断时间管这台设备的全部发射：任意 33 ms 里至少关断规定的时长'}  [assumed]
   jcas60.comm_limit_kind           average  [assumed]
   jcas60.sim                       {'seed': 1, 'frames_averaged': 8, 'buffer_chips': 2048, 'exclude_doppler_bins': 4, 'ridge_doppler_bins': 2, 'exclude_range_lags': 8, 'cfar_guard': 2, 'cfar_train': 8, 'compression_span_db': 12, 'compression_step_db': 2}  [assumed]
-  jcas60.studies                   {'frames': 4, 'analog_samples_per_chip': [2, 4, 8], 'knee_rate': 4, 'knees': [1, 2, 3], 'level_offsets_db': [-3, -1, 1, 3], 'beyond_buffer_chips': 4096, 'beyond_delays_chips': [58, 128, 160, 192, 256, 314, 384, 512, 640, 768, 826], 'window_ranges_m': [2, 5, 8, 10], 'floor_margin_chips': 8, 'fast_velocities_mps': [50, 200], 'adc_delays': 16, 'adc_delay_step_chips': 1.37, 'adc_dither_lsb': [0.25, 0.5], 'leak_delays_s': [1e-10, 2e-10, 5e-10, 1e-09], 'reflector_range_m': 0.02, 'reflector_level_db': -10, 'cfo_hz': [5000.0, 50000.0, 2420000.0], 'mask_offsets_chips': [1.5, 2.5, 3.5, 5, 8], 'scan_step_chip': 0.0625, 'doppler_offsets_bins': [2, 4, 8, 16], 'clutter_over_target_db': 40, 'clutter_range_m': 3}  [assumed]
+  jcas60.studies                   {'frames': 4, 'analog_samples_per_chip': [2, 4, 8], 'knee_rate': 4, 'knees': [1, 2, 3], 'level_offsets_db': [-3, -1, 1, 3], 'beyond_buffer_chips': 4096, 'beyond_delays_chips': [58, 128, 160, 192, 256, 314, 384, 512, 640, 768, 826], 'window_ranges_m': [2, 5, 8, 10], 'floor_margin_chips': 8, 'fast_velocities_mps': [50, 200], 'adc_delays': 16, 'adc_delay_step_chips': 1.37, 'adc_dither_lsb': [0.25, 0.5], 'leak_delays_s': [1e-10, 2e-10, 5e-10, 1e-09], 'reflector_range_m': 0.02, 'reflector_level_db': -10, 'cfo_hz': [5000.0, 50000.0, 2420000.0], 'mask_offsets_chips': [1.5, 2.5, 3.5, 5, 8], 'scan_step_chip': 0.0625, 'doppler_offsets_bins': [2, 4, 8, 16], 'clutter_over_target_db': 40, 'clutter_range_m': 3, 'knee_point_over_p1db_db': 3, 'long_delays_chips': [128, 256, 314, 384, 512, 640, 768, 1024, 1280, 1536, 1600]}  [assumed]
   jcas60.sensing_waveform          {'pattern': ['+Ga_N', '+Gb_N', '+Ga_N', '-Gb_N', '+Ga_N', '+Gb_N', '-Ga_N', '+Gb_N'], 'guard_blocks': 4, 'clean_blocks': 2}  [assumed]
   jcas60.array                     {'tx_elements': [1, 2, 4, 8, 16], 'spacing_lambda': 0.5, 'element_pattern': 'cos', 'steering': 'phase', 'field_of_view_deg': 60, 'crossover_db': 3, 'rx_elements': 1, 'squint_elements': 16, 'simulated_elements': 8}  [assumed]
 
@@ -222,9 +222,10 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   dmg.cef_golay_layout#gu512                                                            [spec]
   dmg.cef_golay_layout#gv512                                                            [spec]
   dmg.cef_golay_layout#sc_order                                                         [spec]
+  dmg.golay_sequences                                                                   [spec]
   dmg.golay_sequences#ga128                                                             [spec]
   dmg.golay_sequences#gb128                                                             [spec]
-  dmg.phy_timing#brpifs_s                                                         2e-05 [spec]
+  dmg.phy_timing#brpifs_s                                                       4.4e-05 [spec]
   dmg.phy_timing#sifs_s                                                           3e-06 [spec]
   edmg.sc_params#chip_rate_hz                                                  1.76e+09 [spec]
   edmg.sc_siso_preamble#edmg_header_a_chips                                        1024 [spec]
@@ -286,8 +287,10 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   ieee80211ay.channel_centres_ghz                                                       [spec]
   ieee80211ay.channel_centres_ghz[2]                                          6.048e+10 [spec]
   ieee80211bf.dmg_bistatic_ppdu#feedback                                                [spec]
+  ieee80211bf.dmg_bistatic_ppdu#min_data_sc_blocks                                   18 [spec]
   ieee80211bf.dmg_bistatic_ppdu#phy_modes                                               [spec]
   ieee80211bf.dmg_bistatic_ppdu#ppdu                                                    [spec]
+  ieee80211bf.dmg_bistatic_ppdu#spacing                                                 [spec]
   ieee80211bf.dmg_bistatic_ppdu#sync_field                                              [spec]
   ieee80211bf.dmg_bistatic_ppdu#trn_format_set_by                                       [spec]
   ieee80211bf.dmg_bistatic_ppdu#tx_initiator                                            [spec]
@@ -389,10 +392,10 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
                                                                         entry (ieee80211bf.dmg_sensing_types): bistatic: transmitter the initiator or the responder, receiver the other of the two
   C     the PPDU, read on the L-CEF            does not fit             here: the plain SC packet of row B, which has no TRN field
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): BRP-RX/TX / BRP-TX / BRP-RX PPDU with a TRN field; Sync field: none
-  C     the PPDU, with the TRN field           does not fit             here: a TRN-R field behind the packet and no Sync field, as a BRP-RX PPDU has -- but no data field, so no BRP frame is in it
+  C     the PPDU, with the TRN field           does not fit             here: a TRN-R field behind the packet and no Sync field, as a BRP-RX PPDU has -- but no data field, so no BRP frame is in it (a BRP frame's SC packet carries at least 18 SC blocks)
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): BRP-RX/TX / BRP-TX / BRP-RX PPDU with a TRN field; Sync field: none
-  C     the exchange                           does not fit             here: 64 packets one way; no BRP frame comes back, no BRPIFS (20 us) and no feedback are in the air time of section 6
-                                                                        entry (ieee80211bf.dmg_bistatic_ppdu): one or more BRP frames with TRN field from the initiator, then after BRPIFS a BRP frame from the responder; feedback: BRP Response frame; may be delayed or aggregated
+  C     the exchange                           does not fit             here: 64 packets one way; no BRP frame comes back, no BRPIFS (44 us) and no feedback are in the air time of section 6 (example 01 section 14 prices the exchange)
+                                                                        entry (ieee80211bf.dmg_bistatic_ppdu): one or more BRP frames with TRN field from the initiator, then after BRPIFS a BRP frame from the responder; SIFS between the BRP frames of the same STA; BRPIFS (a maximum, minimum SIFS) before the other STA's BRP frame; feedback: BRP Response frame; may be delayed or aggregated
   C     the PHY mode                           fits                     here: SC
                                                                         entry (ieee80211bf.dmg_bistatic_ppdu): control or SC mode
   C     the TRN field's format                 fits                     here: 4 units of a TRN-R packet, Golay length 128 (jcas60.trn_sensing)

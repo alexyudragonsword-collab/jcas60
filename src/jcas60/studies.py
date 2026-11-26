@@ -38,6 +38,13 @@ where it draws a conclusion (law 4):
 11. :func:`designed_waveform` -- a waveform made for sensing in the TRN
     field's place (the entries allow one, on four conditions): every block
     correlated, the clean zone twice as long, against the standard subfield.
+12. :func:`measured_knee` -- the limiter's knee had no source: two measured
+    60 GHz compression curves fitted with the same Rapp model, and what each
+    knee makes of the compression criterion and the ghost.
+13. :func:`long_trn` -- the standard's long TRN subfield (TRN_BL = 256): the
+    same field length and SNR, twice the clean zone.
+14. :func:`bistatic_exchange` -- row C laid on the exchange the 802.11bf
+    entry has (BRP frames, SIFS, BRPIFS, a reply): closed form only.
 """
 from __future__ import annotations
 
@@ -46,6 +53,7 @@ import math
 from functools import lru_cache
 
 import numpy as np
+from scipy.optimize import brentq, minimize_scalar
 
 from . import budget as B
 from . import config
@@ -58,6 +66,7 @@ from . import table as T
 from . import wavesim as W
 from .physconst import C0, db, undb
 from .sources import Num
+from .vendor.fmcw_radar.link.compression import rapp
 
 KEY = "jcas60.studies"
 FIG = "rx60.radar_iwr6843_fig7_2"
@@ -553,6 +562,150 @@ def designed_waveform(s, bench) -> dict:
             "conditions": conditions, "rows": rows, "beyond": beyond, "read_to_chips": far, "zones": zones, "gain_db": db(new.n_correlated / std.n_correlated)}
 
 
+# ----------------------------------------------------------------------------- 12. the limiter's knee from measured curves
+CURVES = (("rx60.amp_spasaro2024_compression", "gt_db", "an amplifier"), ("rx60.rx_moody2023_compression", "conversion_gain_db", "a receiver"))
+CHIP2 = "rx60.radar_bgt60tr13c"
+BI = "ieee80211bf.dmg_bistatic_ppdu"
+
+
+def _rapp_gain_db(pin_dbm, ip1db_dbm: float, p: float) -> np.ndarray:
+    """The Rapp limiter's gain [dB] at each input power, its input 1 dB point at ``ip1db_dbm`` (fmcw_radar's ``rapp``)."""
+    a = np.sqrt(10.0 ** (np.atleast_1d(np.asarray(pin_dbm, dtype=float)) / 10.0))
+    return 20.0 * np.log10(np.abs(rapp(a, math.sqrt(undb(ip1db_dbm)), p)) / a)
+
+
+def _fit_knee(pin, gain, ip1db: float, free_p1db: bool) -> dict:
+    """Least squares of the Rapp gain curve on every point read off the figure: the knee ``p`` and the small-signal
+    gain, with the input 1 dB point the paper's own figure, or (``free_p1db``) fitted as well."""
+    tight = {"xatol": 1e-10}
+
+    def left(p, p1):
+        r = gain - _rapp_gain_db(pin, p1, p)
+        return r - float(np.mean(r)), float(np.mean(r))
+
+    def cost(p, p1):
+        return float(np.sum(left(p, p1)[0] ** 2))
+
+    def best_p1(p):
+        return minimize_scalar(lambda p1: cost(p, p1), bounds=(ip1db - 3.0, ip1db + 3.0), method="bounded", options=tight)
+    if free_p1db:
+        p = float(minimize_scalar(lambda q: best_p1(q).fun, bounds=(0.3, 8.0), method="bounded", options=tight).x)
+        p1 = float(best_p1(p).x)
+    else:
+        p = float(minimize_scalar(lambda q: cost(q, ip1db), bounds=(0.3, 8.0), method="bounded", options=tight).x)
+        p1 = ip1db
+    r, g0 = left(p, p1)
+    return {"p": p, "ip1db_dbm": p1, "small_signal_gain_db": g0, "rms_db": float(np.sqrt(np.mean(r ** 2))), "worst_db": float(np.abs(r).max())}
+
+
+def measured_knee(s, bench) -> dict:
+    """ROADMAP item 1's last part: the knee had no source.  Two measured 60 GHz compression curves (spec_sources#59;
+    read off the papers' figures) fitted with the same Rapp model, and what each fitted knee makes of the comparison
+    table's compression criterion and of the ghost.  Only the shape is taken from them: the 1 dB point stays the
+    radar chip's, and the table's own knee stays what fmcw_radar's is (law 2)."""
+    over = S.num(KEY + "#knee_point_over_p1db_db").value
+    rate = int(S.num(KEY + "#knee_rate").value)
+    p1 = s.fe.p1db_inband_dbm.value
+    span, step = float(s.sim["compression_span_db"]), float(s.sim["compression_step_db"])
+    levels = p1 + np.arange(-span, span + step / 2, step)
+    eirp = R.readings(s)[0].eirp_dbm
+    cost = B.monostatic_cost(s, eirp, bench.sim.unit_envelope(s.leak_delay_s.value))
+    rows = []
+    for key, column, what in CURVES:
+        pin, gain = np.asarray(S.raw(f"{key}#pin_dbm"), dtype=float), np.asarray(S.raw(f"{key}#{column}"), dtype=float)
+        ip1db = S.num(f"{key}#ip1db_dbm").value
+        fixed, free = _fit_knee(pin, gain, ip1db, False), _fit_knee(pin, gain, ip1db, True)
+        # the other road: one point, the compression read 3 dB above the 1 dB point (how spec_sources compared them)
+        at = float(gain[0] - np.interp(ip1db + over, pin, gain))
+        one = brentq(lambda p: -_rapp_gain_db(ip1db + over, ip1db, p)[0] - at, 0.3, 8.0)
+        roads = _limiter_roads(s, bench, rate, fixed["p"], levels)
+        needs = {"in-band compression": roads["need_closed_db"], "ADC quantisation": cost.need_adc_db.value, "LO phase noise on the leakage": cost.need_pn_db.value}
+        rows.append({"key": key, "what": what, "points": int(pin.size), "ip1db_dbm": ip1db, "fixed": fixed, "free": free,
+                     "compression_over_db": at, "p_one_point": float(one), "roads": roads,
+                     "binding": max(needs, key=needs.get), "need_db": max(needs.values())})
+    placeholder = {"p": s.rx_rapp_p.value, "need_compression_db": cost.need_compression_db.value, "need_pn_db": cost.need_pn_db.value,
+                   "need_adc_db": cost.need_adc_db.value, "need_db": cost.need_db.value, "binding": cost.binding,
+                   "compression_over_db": float(-_rapp_gain_db(over, 0.0, s.rx_rapp_p.value)[0])}
+    iso = S.num(CHIP2 + "#tx_rx_isolation_db_typ")
+    return {"rows": rows, "placeholder": placeholder, "over_db": over, "rate": rate, "isolation_best_db": s.fe.isolation_db[-1][1].value,
+            "chip2": {"isolation_db": iso.value, "p1db_typ_dbm": S.num(CHIP2 + "#rx_p1db_dbm_typ").value, "spare_db": iso.value - cost.need_db.value}}
+
+
+# ----------------------------------------------------------------------------- 13. the long TRN subfield
+def long_trn(s, bench) -> dict:
+    """ROADMAP item 2's other way to a longer clean window: TRN_SEQ_LENGTH = long, every block a Golay sequence of
+    256 chips (spec_sources#59 brought the pair).  Half as many units keep the field's length, so the air time and the
+    correlated chips stay what the table's TRN rows have."""
+    blocks = tuple(int(b) for b in S.raw("jcas60.trn_sensing#correlated_blocks"))
+    n_std = int(S.num("edmg.trn_field#trn_bl@trn_seq_length=normal").value)
+    n_long = int(S.num("edmg.trn_field#trn_bl@trn_seq_length=long").value)
+    units = s.trn_units.value * n_std / n_long
+    if units != int(units):
+        raise ValueError("the table's TRN units do not make a whole number of long units of the same length")
+    std, new = s.trn_field, F.trn(int(units), blocks, "long")
+    long_buf = dataclasses.replace(s, sim={**s.sim, "buffer_chips": int(S.num(KEY + "#beyond_buffer_chips").value)})
+    sim = W.Simulator(long_buf, new)
+    eirp = R.readings(s)[0].eirp_dbm
+    req = B.cfar_snr_required(s, A.rep("detection.pfa", "assumed"))
+    ga, gb = F.tabulated(f"ga{n_long}"), F.tabulated(f"gb{n_long}")
+    ra, rb = F.from_recursion(n_long)
+    acf = np.correlate(ga, ga, "full") + np.correlate(gb, gb, "full")
+    rows = []
+    for name, field, fsim in ((f"TRN_BL = {n_std}, {s.trn_units.value:g} units", std, bench.sim_trn), (f"TRN_BL = {n_long}, {units:g} units", new, sim)):
+        link = B.link(s, "monostatic", eirp, field=field)
+        g, tgt, _ = bench.paths("monostatic", link, 0.0)
+        strong = T.strong_path_dbm(s, "monostatic", eirp, s.fe.isolation_db[-1][1])
+        got = bench.read([tgt, _leak(s, strong.value)], bench.options("monostatic"), int(round(g.delay_s * fsim.fs)), sim=fsim)
+        golay = T.golay_under_doppler(s, bench, (0.0, s.velocity_mps.value), fsim, field.chips.size)
+        rows.append({"name": name, "field_chips": int(field.chips.size), "correlated_chips": field.n_correlated, "clean_chips": field.zero_sidelobe_chips,
+                     "clean_m": field.zero_sidelobe_chips * s.chip_m, "snr_cell_db": link.snr_cell_db.value, "snr_grid_db": link.snr_grid_db.value,
+                     "snr_sim_db": got["snr_db"], "range_snr_m": B.detection_range_m(s, "monostatic", eirp, req, field).value,
+                     "sidelobe_rest_dbc": golay[0][1], "sidelobe_moving_dbc": golay[1][1]})
+    margin = int(S.num(KEY + "#floor_margin_chips").value)
+    delays = [int(d) for d in S.raw(KEY + "#long_delays_chips")]
+    far = new.zero_sidelobe_chips - margin
+    prof = _chip_profile(new, max(delays) + new.zero_sidelobe_chips)
+    worst = max(((_ghost(prof, d, far)[0], d) for d in range(new.zero_sidelobe_chips + 1, max(delays) + 1)))
+    return {"rows": rows, "units": int(units), "beyond": _beyond_rows(s, prof, sim, delays, far), "read_to_chips": far,
+            "worst_level": worst[0], "worst_delay_chips": worst[1], "subfield_chips": len(S.raw("edmg.trn_field#basic_subfield")) * n_long,
+            "pair": {"length": n_long, "recursion_equals_table": bool(np.array_equal(ra, ga) and np.array_equal(rb, gb)),
+                     "acf_peak": float(acf[n_long - 1]), "acf_worst_sidelobe": float(np.abs(np.delete(acf, n_long - 1)).max())}}
+
+
+# ----------------------------------------------------------------------------- 14. the bistatic exchange as the entry has it
+def bistatic_exchange(s) -> dict:
+    """ROADMAP item 13: row C sends its packets one way.  The entry's exchange (spec_sources#59): BRP frames, whose SC
+    packet carries at least 18 SC blocks of data, SIFS between the frames of one station, a reply from the other after
+    at most BRPIFS.  Closed form only -- it is arithmetic on the packet lengths -- for two ways of laying a frame of
+    the table's 64 packets on it."""
+    rc, n, frames = s.chip_rate_hz.value, int(s.n_packets.value), s.frames_per_s.value
+    sifs, brpifs = s.sifs_s.value, S.num("dmg.phy_timing#brpifs_s").value
+    if (S.raw(BI + "#same_sta_spacing"), S.raw(BI + "#reply_spacing")) != ("SIFS", "BRPIFS"):
+        raise ValueError("the bistatic entry's spacings are not SIFS within a station and BRPIFS before the reply")
+    blocks = int(S.num(BI + "#min_data_sc_blocks").value)
+    data = blocks * S.num("dmg.phy_params#sc_block_chips").value + S.num("dmg.phy_params#sc_gi_chips").value
+    if str(S.raw("dmg.sc_ppdu_chips#data_chips")).replace(" ", "") != "N_BLKS*512+64":
+        raise ValueError("dmg.sc_ppdu_chips: the data field is no longer N_BLKS blocks and one guard interval")
+    sound = (s.trn_packet_chips.value + data) / rc                # a BRP frame with the TRN field behind it
+    reply = (s.packet_chips.value + data) / rc                    # the BRP frame that comes back: no TRN field
+    here = R.air_time(s, R.readings(s)[0], s.trn_field).fraction.value
+    lam = s.wavelength_m
+
+    def doppler(pri):
+        return {"interval_s": pri, "velocity_max_mps": lam / (4.0 * pri), "velocity_res_mps": lam / (2.0 * n * pri)}
+    # (a) one exchange a frame: the packets back to back at SIFS, one reply after BRPIFS (at most) -- or after SIFS (at least)
+    burst = n * sound + (n - 1) * sifs
+    a = {"frame_s": burst + brpifs + reply, "air": (burst + brpifs + reply) * frames, "air_min": (burst + sifs + reply) * frames, **doppler(sound + sifs)}
+    # (b) one exchange a packet, at the table's packet interval: sounding, BRPIFS, reply
+    each = sound + brpifs + reply
+    b = {"exchange_s": each, "fits_the_interval": bool(each + sifs <= s.interval_s.value), "air": each * n * frames,
+         "air_emitted": (sound + reply) * n * frames, **doppler(s.interval_s.value)}
+    body = S.raw(BI + "#body_octets")
+    return {"data_blocks": blocks, "data_chips": data, "data_s": data / rc, "sounding_s": sound, "sounding_now_s": s.packet_seconds(s.trn_field).value,
+            "reply_s": reply, "sifs_s": sifs, "brpifs_s": brpifs, "air_now": here, "one_exchange_a_frame": a, "one_exchange_a_packet": b,
+            "table": doppler(s.interval_s.value), "body_octets": int(sum(body.values())), "frame_type": str(S.raw(BI + "#frame_type"))}
+
+
 # ----------------------------------------------------------------------------- all of them
 @lru_cache(maxsize=1)
 def build() -> dict:
@@ -561,7 +714,7 @@ def build() -> dict:
     return {"setup": s, "limiter": limiter(s, bench), "gains": gain_settings(s, bench), "beyond": beyond_window(s, bench),
             "fast": fast_targets(s, bench), "adc": undithered_adc(s, bench), "leak": leakage_paths(s, bench),
             "lo": same_lo(s, bench), "sync": bistatic_sync(s, bench), "window": range_window(s, bench), "second": second_target(s, bench),
-            "designed": designed_waveform(s, bench)}
+            "designed": designed_waveform(s, bench), "knee": measured_knee(s, bench), "long_trn": long_trn(s, bench), "exchange": bistatic_exchange(s)}
 
 
 def _f(v, fmt="{:.2f}") -> str:
@@ -745,4 +898,59 @@ def render(t: dict | None = None) -> str:
         w(f"{r['delay_chips']:20d} {r['range_m']:10.2f} {db(r['level_closed']):35.1f} dB {db(r['level_sim']):9.1f} dB")
     w("  against section 3: the standard subfield shows a target 256 chips past its place 6.1 dB down and folds at 768 chips; this one is clean to 256 chips, "
       "noise-like about 21 dB down from there to 768, and folds at 1024 chips")
+    w("")
+    kn = t["knee"]
+    ph = kn["placeholder"]
+    w("== 12. the limiter's knee from measured curves (ROADMAP item 1; spec_sources#59: two 60 GHz compression curves read off the papers' figures, fitted with the same Rapp model) ==")
+    w(f"{'curve':>36s} {'points':>7s} {'its P1dB':>10s} {'p, P1dB as published':>22s} {'residual rms / worst':>22s} {'p, P1dB fitted too':>20s} {'P1dB':>10s} {'rms':>9s} "
+      f"{'compression ' + format(kn['over_db'], 'g') + ' dB over P1dB':>30s} {'p from that point':>19s}")
+    for r in kn["rows"]:
+        w(f"{r['key']:>36s} {r['points']:7d} {r['ip1db_dbm']:6.1f} dBm {r['fixed']['p']:22.3f} {r['fixed']['rms_db']:11.3f} / {r['fixed']['worst_db']:.3f} dB {r['free']['p']:20.3f} "
+          f"{r['free']['ip1db_dbm']:6.2f} dBm {r['free']['rms_db']:6.3f} dB {r['compression_over_db']:27.2f} dB {r['p_one_point']:19.3f}")
+    w(f"  the table's knee is p = {ph['p']:g}, fmcw_radar's placeholder: {ph['compression_over_db']:.2f} dB of compression at that point.  Both measured curves bend more gently")
+    w(f"  what each knee makes of row B (communication limit; the radar chip's own P1dB kept, only the shape exchanged; {kn['rate']} samples a chip):")
+    w(f"{'knee':>36s} {'compression needs: closed':>27s} {'simulated':>10s} {'phase noise':>12s} {'ADC':>9s} {'isolation needed':>18s} {'what binds':>30s} "
+      f"{'against ' + format(kn['isolation_best_db'], 'g') + ' dB':>15s} {'ghost under the floor: bound':>30s} {'simulated':>10s}")
+    w(f"{'p = ' + format(ph['p'], 'g') + ' (the table)':>36s} {ph['need_compression_db']:24.2f} dB {'':>10s} {ph['need_pn_db']:9.2f} dB {ph['need_adc_db']:6.2f} dB {ph['need_db']:15.2f} dB "
+      f"{ph['binding']:>30s} {ph['need_db'] - kn['isolation_best_db']:+12.2f} dB")
+    for r in kn["rows"]:
+        q = r["roads"]
+        w(f"{'p = ' + format(r['fixed']['p'], '.3f') + ' (' + r['what'] + ')':>36s} {q['need_closed_db']:24.2f} dB {_f(q['need_sim_db']):>7s} dB {ph['need_pn_db']:9.2f} dB {ph['need_adc_db']:6.2f} dB "
+          f"{r['need_db']:15.2f} dB {r['binding']:>30s} {r['need_db'] - kn['isolation_best_db']:+12.2f} dB {_f(q['ghost_closed_db']):>27s} dB {_f(q['ghost_sim_db']):>7s} dB")
+    w("  the ghost's closed form is the small-signal image, an upper bound once the leakage is deep in the limiter (the table's section 5); the simulated figure is the reading")
+    w("  a gentler knee lets the compression criterion go and leaves the LO's phase noise on the leakage as what binds: the isolation needed hardly moves, the reason does")
+    w("  not known from these curves: AM/PM (neither paper gives it), memory, and whether the radar chip's receiver bends like either device")
+    c2 = kn["chip2"]
+    w(f"  another radar chip's datasheet ({CHIP2}): TX-to-RX isolation {c2['isolation_db']:g} dB typ at the die, package excluded -- {c2['spare_db']:+.2f} dB against the table's need; "
+      f"its receiver's P1dB is {c2['p1db_typ_dbm']:g} dBm typ, one number, no curve")
+    w("")
+    lt = t["long_trn"]
+    w(f"== 13. the long TRN subfield: TRN_BL = {lt['pair']['length']} (ROADMAP item 2; the pair is spec_sources#59's edmg.golay_sequences_long) ==")
+    w(f"  Ga{lt['pair']['length']} / Gb{lt['pair']['length']}: the entry's D and W through the recursion give the tabulated sequences: {'yes' if lt['pair']['recursion_equals_table'] else 'NO'}; "
+      f"aperiodic autocorrelations summed: {lt['pair']['acf_peak']:g} at zero shift, {lt['pair']['acf_worst_sidelobe']:g} at the worst other")
+    w(f"{'':>28s} {'field':>12s} {'correlated chips':>18s} {'clean zone':>22s} {'SNR(cell)':>11s} {'on the grid: closed':>21s} {'simulated':>10s} {'range at Pd 0.9 by SNR':>24s} "
+      f"{'sidelobes at rest':>19s} {'at 2 m/s':>10s}")
+    for r in lt["rows"]:
+        w(f"{r['name']:>28s} {r['field_chips']:6d} chips {r['correlated_chips']:18d} {r['clean_chips']:6d} chips = {r['clean_m']:5.2f} m {r['snr_cell_db']:8.2f} dB {r['snr_grid_db']:18.2f} dB "
+          f"{r['snr_sim_db']:7.2f} dB {r['range_snr_m']:22.2f} m {r['sidelobe_rest_dbc']:15.1f} dBc {r['sidelobe_moving_dbc']:6.1f} dBc")
+    w(f"{'target at [chips]':>20s} {'range [m]':>10s} {'strongest on lags 0-' + str(lt['read_to_chips']) + ': chips road':>38s} {'simulation':>12s} {'shows at [chips]':>18s}")
+    for r in lt["beyond"]:
+        w(f"{r['delay_chips']:20d} {r['range_m']:10.2f} {db(r['level_closed']):35.1f} dB {db(r['level_sim']):9.1f} dB {_f(r['lag_closed'], '{:d}'):>18s}")
+    w(f"  the worst a target anywhere past the window does: {db(lt['worst_level']):.1f} dB, from {lt['worst_delay_chips']} chips; the subfield is {lt['subfield_chips']} chips, "
+      "where a target folds back whole.  The same field length, air time and SNR as the table's TRN rows, twice the clean zone, the ghost twice as far")
+    w("")
+    ex = t["exchange"]
+    xa, xb, xt = ex["one_exchange_a_frame"], ex["one_exchange_a_packet"], ex["table"]
+    w("== 14. the bistatic exchange as the entry has it (ROADMAP item 13; ieee80211bf.dmg_bistatic_ppdu after spec_sources#59; closed form only: arithmetic on packet lengths) ==")
+    w(f"  a BRP frame ({ex['frame_type']}; {ex['body_octets']} octets of body known) in an SC packet carries at least {ex['data_blocks']} SC blocks: {ex['data_chips']:g} chips, {ex['data_s'] * 1e6:.2f} us of data field")
+    w(f"  the sounding packet {ex['sounding_now_s'] * 1e6:.2f} -> {ex['sounding_s'] * 1e6:.2f} us; the BRP frame that comes back {ex['reply_s'] * 1e6:.2f} us; "
+      f"SIFS {ex['sifs_s'] * 1e6:g} us between one station's frames, at most BRPIFS {ex['brpifs_s'] * 1e6:g} us before the other's")
+    w(f"{'':>52s} {'air time':>12s} {'packet interval':>17s} {'unambiguous to +-':>22s} {'velocity resolution':>21s}")
+    w(f"{'row C as the table has it (one way, no data field)':>52s} {ex['air_now'] * 100:10.2f} % {xt['interval_s'] * 1e6:14.2f} us {xt['velocity_max_mps']:18.2f} m/s {xt['velocity_res_mps']:17.2f} m/s")
+    w(f"{'one exchange a frame: 64 frames at SIFS, one reply':>52s} {xa['air'] * 100:10.2f} % {xa['interval_s'] * 1e6:14.2f} us {xa['velocity_max_mps']:18.2f} m/s {xa['velocity_res_mps']:17.2f} m/s")
+    w(f"{'one exchange a packet, at the table interval':>52s} {xb['air'] * 100:10.2f} % {xb['interval_s'] * 1e6:14.2f} us {xb['velocity_max_mps']:18.2f} m/s {xb['velocity_res_mps']:17.2f} m/s")
+    w(f"  one exchange a frame: {xa['air_min'] * 100:.2f} % if the reply comes after SIFS; the packets cannot be spread out, so the Doppler axis is the packet's own length")
+    w(f"  one exchange a packet: sounding, BRPIFS and reply take {xb['exchange_s'] * 1e6:.2f} us of the {xt['interval_s'] * 1e6:g} us ({'fits' if xb['fits_the_interval'] else 'DOES NOT FIT'}); "
+      f"{xb['air_emitted'] * 100:.2f} % is emitted, the rest of the {xb['air'] * 100:.2f} % is the medium held through BRPIFS")
+    w("  not found in public material (spec_sources#59): the MAC header's length, a reply once per several exchanges, an exchange with no reply")
     return "\n".join(L) + "\n"
