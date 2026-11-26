@@ -35,6 +35,8 @@ RECORD = REPO / "src" / "jcas60" / "data" / "upstream" / "fmcw_radar_budget.json
 UPSTREAM = {"repo": "fmcw_radar", "sha": "c303566180c2ef22bd2bf6ffaa1f08e59174e110",
             "config": "configs/radar_60g_sensing.yaml",
             "command": "python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>"}
+#: other configs of the same pin, recorded beside the default's (the studies read them; row A never does)
+VARIANTS = {"x10lo": "configs/radar_60g_x10lo.yaml"}
 ROOTS = ("/home/user", "/home/user/alexyudragonsword-collab")
 RTOL = 1e-9
 
@@ -45,8 +47,13 @@ def sibling(explicit: str | None = None) -> Path | None:
     return next((Path(c) for c in cands if c and (Path(c) / ".git").exists()), None)
 
 
-def regenerate(root: Path) -> dict:
+def variant_record(name: str) -> Path:
+    return RECORD.with_name(f"fmcw_radar_budget_{name}.json")
+
+
+def regenerate(root: Path, config: str | None = None) -> dict:
     sha = UPSTREAM["sha"]
+    config = config or UPSTREAM["config"]
     if subprocess.run(["git", "-C", str(root), "cat-file", "-e", f"{sha}^{{commit}}"], capture_output=True).returncode:
         subprocess.run(["git", "-C", str(root), "fetch", "--quiet", "--depth=1", "origin", sha], capture_output=True)
     tar = subprocess.run(["git", "-C", str(root), "archive", sha], capture_output=True, check=True).stdout
@@ -54,7 +61,7 @@ def regenerate(root: Path) -> dict:
         with tarfile.open(fileobj=BytesIO(tar)) as t:
             t.extractall(tmp, filter="data")
         out = Path(tmp) / "report.json"
-        subprocess.run([sys.executable, "tools/budget_report.py", UPSTREAM["config"], "-o", str(Path(tmp) / "report.md"),
+        subprocess.run([sys.executable, "tools/budget_report.py", config, "-o", str(Path(tmp) / "report.md"),
                         "--json", str(out)], cwd=tmp, check=True, capture_output=True)
         return json.loads(out.read_text(encoding="utf-8"))
 
@@ -86,19 +93,24 @@ def main(argv=None) -> int:
     if root is None:
         print("fmcw_radar checkout not found: the recorded report cannot be verified here")
         return 1 if (args.strict or args.mode == "record") else 0
-    report = regenerate(root)
-    if args.mode == "record":
-        RECORD.parent.mkdir(parents=True, exist_ok=True)
-        RECORD.write_text(json.dumps({"_provenance": UPSTREAM, "report": report}, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-        print(f"wrote {RECORD.relative_to(REPO)}")
-        return 0
-    have = json.loads(RECORD.read_text(encoding="utf-8"))
-    diffs = ([] if have["_provenance"] == UPSTREAM else ["_provenance differs from this tool's pin"]) \
-        + differences(have["report"], json.loads(json.dumps(report)))
-    for d in diffs:
-        print(d)
-    print(f"fmcw_radar@{UPSTREAM['sha'][:7]} budget report: " + ("identical to the recorded copy" if not diffs else f"{len(diffs)} difference(s)"))
-    return 1 if diffs else 0
+    bad = 0
+    for name, config in [(None, UPSTREAM["config"])] + sorted(VARIANTS.items()):
+        record = RECORD if name is None else variant_record(name)
+        prov = UPSTREAM if name is None else {**UPSTREAM, "config": config, "command": UPSTREAM["command"].replace(UPSTREAM["config"], config)}
+        report = regenerate(root, config)
+        if args.mode == "record":
+            record.parent.mkdir(parents=True, exist_ok=True)
+            record.write_text(json.dumps({"_provenance": prov, "report": report}, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+            print(f"wrote {record.relative_to(REPO)}")
+            continue
+        have = json.loads(record.read_text(encoding="utf-8"))
+        diffs = ([] if have["_provenance"] == prov else ["_provenance differs from this tool's pin"]) \
+            + differences(have["report"], json.loads(json.dumps(report)))
+        for d in diffs:
+            print(d)
+        print(f"fmcw_radar@{UPSTREAM['sha'][:7]} budget report ({config}): " + ("identical to the recorded copy" if not diffs else f"{len(diffs)} difference(s)"))
+        bad += bool(diffs)
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":

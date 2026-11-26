@@ -34,6 +34,7 @@ class FrontEnd:
     pn_psd0_dbchz: Num         # the ay rows' LO: PSD0 (1 + (f/fz)^2) / (1 + (f/fp)^2)
     pn_f_pole_hz: Num
     pn_f_zero_hz: Num
+    pn_profile: tuple | None = None   # ((offsets [Hz]), (L(f) [dBc/Hz])): a tabulated LO instead of the model (the studies' x10 LO)
 
     @property
     def eirp_max_dbm(self) -> Num:
@@ -57,6 +58,9 @@ class FrontEnd:
         """The LO's phase-noise PSD at offset ``f_hz`` (array or scalar), dBc/Hz: tgad_em.pn_model_shape."""
         import numpy as np
         f = np.abs(np.asarray(f_hz, dtype=float))
+        if self.pn_profile is not None:                      # log-frequency interpolation, held flat past either end
+            fp, lp = (np.asarray(x, dtype=float) for x in self.pn_profile)
+            return np.interp(np.log10(np.maximum(f, fp[0])), np.log10(fp), lp)
         return self.pn_psd0_dbchz.value + 10.0 * np.log10((1.0 + (f / self.pn_f_zero_hz.value) ** 2)
                                                           / (1.0 + (f / self.pn_f_pole_hz.value) ** 2))
 
@@ -77,3 +81,17 @@ def shared() -> FrontEnd:
         pn_f_pole_hz=S.num("tgad_em.pn_params#f_pole_hz", "Hz"),
         pn_f_zero_hz=S.num("tgad_em.pn_params#f_zero_hz", "Hz"),
     )
+
+
+X10_PROFILE = "mmw60/data/clock_profiles/pllsim_wu19_x10_60p48g_floor150.yaml"
+
+
+def with_x10_lo(fe: FrontEnd) -> FrontEnd:
+    """The same front end with mmw60_trx's x10 LO (the profile fmcw_radar's ``radar_60g_x10lo.yaml`` reads) in the
+    place of the phase-noise model: L(f) as tabulated, its spurs left out (this engine draws no spur conclusions)."""
+    import dataclasses
+    from pathlib import Path
+
+    import yaml
+    d = yaml.safe_load((Path(__file__).resolve().parent / "vendor" / X10_PROFILE).read_text(encoding="utf-8"))
+    return dataclasses.replace(fe, pn_profile=(tuple(float(x) for x in d["f_hz"]), tuple(float(x) for x in d["l_dbc_hz"])))

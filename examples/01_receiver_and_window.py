@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Example 01: six questions the comparison table raises (the ROADMAP's list, in its order).
+"""Example 01: eight questions the comparison table raises (the ROADMAP's list, in its order).
 
 1. The receiver's compression is computed at the ADC's two samples a chip:
    what is it in continuous time, and how much rides on the limiter's knee?
@@ -10,10 +10,12 @@
 5. The ADC that nothing dithers, as a statistic over the target's delay, and
    with a dither.
 6. The leakage's delay as a variable, and a near reflector as a second path.
+7. Every row on one LO.
+8. The bistatic rows' leftover carrier offset.
 
     python examples/01_receiver_and_window.py
 
-About 100 s.  ``tools/example_drift.py`` compares the output with
+About 130 s.  ``tools/example_drift.py`` compares the output with
 ``examples/expected/01_receiver_and_window.txt``.
 """
 import sys

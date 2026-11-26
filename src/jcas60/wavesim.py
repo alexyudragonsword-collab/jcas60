@@ -63,6 +63,7 @@ class Options:
     lo: str | None = None              # None: no phase noise | "shared" | "independent"
     reference_lag: int | None = None   # bistatic: the lag (in samples) whose phase every packet is turned back by
     random_packet_phase: bool = False  # bistatic: an unknown carrier phase per packet (no common LO)
+    cfo_hz: float = 0.0                # bistatic: what is left of the two devices' carrier offset, turning everything received
     seed: int = 1
     n_packets: int | None = None       # default: the setup's
 
@@ -211,6 +212,8 @@ class Simulator:
                 fd = -p.path_rate_mps / lam                                             # receding: negative Doppler
                 wave = np.fft.ifft(tx_f * np.exp(-2j * np.pi * self.g_freq * tau))
                 y += (math.sqrt(undb(p.power_dbm)) * scale * np.exp(-2j * np.pi * s.carrier_hz.value * tau)) * wave * np.exp(2j * np.pi * fd * self.g_t)
+            if opt.cfo_hz:
+                y *= np.exp(2j * np.pi * opt.cfo_hz * (self.g_t + t_k))
             if opt.random_packet_phase:
                 y *= np.exp(2j * np.pi * rng.uniform())
             if phi_rx is not None:

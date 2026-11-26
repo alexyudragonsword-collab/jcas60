@@ -15,7 +15,7 @@ PINS = {"spec_sources": "3a6e1905ef7c48c01338cf9cd808e3fd4bdad8a7", "mmw60_trx":
 
 def test_every_vendored_file_names_its_upstream_at_a_full_sha():
     files = V.vendored_files()
-    assert len(files) == 17
+    assert len(files) == 18
     for f in files:
         m = V.HEADER.match(f.read_text(encoding="utf-8").splitlines()[0])
         assert m, f

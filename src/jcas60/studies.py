@@ -25,6 +25,11 @@ where it draws a conclusion (law 4):
    what a dither buys and costs.
 6. :func:`leakage_paths` -- the leakage's delay as a variable, and a near
    reflector as a second path whose phase-noise residue adds in amplitude.
+7. :func:`same_lo` -- every row on one LO: fmcw_radar's own report of its
+   x10-LO config next to its default's, and the ay rows' phase-noise terms
+   with that LO's profile in the place of the model.
+8. :func:`bistatic_sync` -- what the two devices' leftover carrier offset
+   costs inside a packet, and the direct path's phase noise on the TRN field.
 """
 from __future__ import annotations
 
@@ -36,6 +41,8 @@ import numpy as np
 
 from . import budget as B
 from . import config
+from . import fmcw_row as A
+from . import frontend as FE
 from . import regulatory as R
 from . import sources as S
 from . import table as T
@@ -314,13 +321,89 @@ def leakage_paths(s, bench) -> dict:
                           "rise_alone_closed_db": B.floor_rise_db(level + db(alone), n0)}}
 
 
+# ----------------------------------------------------------------------------- 7. one LO for every row
+def _bistatic_pn(sv, bench, field, sim, frames: int | None = None) -> dict:
+    """The direct path's phase noise in the bistatic rows: two LOs, each packet turned back by the phase read on the
+    direct path over the correlated field.  ``frames``: how many frames the floor is read on (the TRN field's phase
+    noise is slow to synthesise, and a floor is the mean of thousands of cells: one frame reads it)."""
+    keep, bench.frames = bench.frames, frames or bench.frames
+    try:
+        return _bistatic_pn_read(sv, bench, field, sim)
+    finally:
+        bench.frames = keep
+
+
+def _bistatic_pn_read(sv, bench, field, sim) -> dict:
+    eirp = R.readings(sv)[0].eirp_dbm
+    link = B.link(sv, "bistatic", eirp, field=field)
+    direct = T.strong_path_dbm(sv, "bistatic", eirp)
+    g, tgt, st = bench.paths("bistatic", link, direct.value)
+    near = int(round(g.delay_s * sim.fs))
+    lin = bench.read([tgt, st], bench.options("bistatic"), near, sim=sim)
+    pn = bench.read([tgt, st], bench.options("bistatic", lo="independent"), near, sim=sim)
+    span = (field.windows[-1][0] + len(field.windows[-1][1]) - field.windows[0][0]) / sv.chip_rate_hz.value
+    unit = len(field.windows[0][1]) / sv.chip_rate_hz.value           # one correlation window: a complementary unit
+    res, whole = B.pn_residual_independent(sv, unit), B.pn_residual_independent(sv, span)
+    return {"reference_s": unit, "span_s": span, "residual_dbc": db(res), "rise_whole_field_closed_db": B.floor_rise_db(direct.value + db(whole), link.noise_chip_dbm.value), "rise_closed_db": B.floor_rise_db(direct.value + db(res), link.noise_chip_dbm.value),
+            "rise_sim_db": pn["floor_dbm"] - lin["floor_dbm"], "snr_change_sim_db": pn["snr_db"] - lin["snr_db"]}
+
+
+def same_lo(s, bench) -> dict:
+    sx = dataclasses.replace(s, fe=FE.with_x10_lo(s.fe))
+    eirp = R.readings(s)[0].eirp_dbm
+    rep = {"default": A.report(), "x10lo": A.variant("x10lo")["report"]}
+    a = {k: {"lo_source": r["radar"]["lo_source"], "snr_cell_db": r["detection"]["snr_cell_db"], "lo_rms_rad": r["phase_noise"]["lo_rms_rad"],
+             "pn_mean_cell_dbc": r["phase_noise"]["mean_cell_dbc"], "pn_local_cell_dbc": r["phase_noise"]["local_cell_dbc"]} for k, r in rep.items()}
+    iso = s.fe.isolation_db[-1][1].value
+    rows = []
+    for name, sv in (("the model the table's rows use", s), ("mmw60_trx's x10 LO", sx)):
+        sim = W.Simulator(sv)
+        cost = B.monostatic_cost(sv, eirp, sim.unit_envelope(sv.leak_delay_s.value))
+        link = B.link(sv, "monostatic", eirp)
+        g, tgt, _ = bench.paths("monostatic", link, 0.0)
+        near = int(round(g.delay_s * sim.fs))
+        level = cost.conducted_dbm.value - iso
+        lin = bench.read([tgt, _leak(sv, level)], bench.options("monostatic"), near, sim=sim)
+        pn = bench.read([tgt, _leak(sv, level)], bench.options("monostatic", lo="shared"), near, sim=sim)
+        rows.append({"lo": name, "at_1mhz_dbchz": float(sv.fe.pn_dbchz(1e6)), "at_100mhz_dbchz": float(sv.fe.pn_dbchz(1e8)),
+                     "residual_dbc": cost.pn_residual_dbc.value, "need_pn_db": cost.need_pn_db.value, "need_db": cost.need_db.value, "binding": cost.binding,
+                     "rise_closed_db": B.floor_rise_db(level + cost.pn_residual_dbc.value, link.noise_chip_dbm.value), "rise_sim_db": pn["floor_dbm"] - lin["floor_dbm"],
+                     "bistatic": [{"field": fname, **_bistatic_pn(sv, bench, field, W.Simulator(sv, field), frames)}
+                                  for fname, field, frames in (("L-CEF", sv.field, None), ("TRN field", sv.trn_field, 1))]})
+    return {"row_a": a, "isolation_db": iso, "rows": rows}
+
+
+# ----------------------------------------------------------------------------- 8. the bistatic rows' synchronisation
+def bistatic_sync(s, bench) -> dict:
+    eirp = R.readings(s)[0].eirp_dbm
+    out = []
+    for name, field in (("L-CEF", s.field), ("TRN field", s.trn_field)):
+        sim = bench.sim_for(field)
+        link = B.link(s, "bistatic", eirp, field=field)
+        direct = T.strong_path_dbm(s, "bistatic", eirp)
+        g, tgt, st = bench.paths("bistatic", link, direct.value)
+        near = int(round(g.delay_s * sim.fs))
+
+        def peak(cfo, sim=sim, tgt=tgt, st=st, near=near):
+            return sim.read(sim.frame([tgt, st], bench.options("bistatic", noise=False, cfo_hz=cfo), 0), near, (0,))["peak_mw"]
+        clean = peak(0.0)
+        rate = tgt.path_rate_mps                                    # the target's own Doppler is in the same sum: the offset adds to it
+        rows = [{"cfo_hz": float(c), "turns": float(c) * field.chips.size / s.chip_rate_hz.value,
+                 "loss_closed_db": B.inpacket_loss_db(s, field, rate) - B.inpacket_loss_db(s, field, rate - float(c) * s.wavelength_m),
+                 "loss_sim_db": -db(peak(float(c)) / clean)}
+                for c in S.raw(KEY + "#cfo_hz")]
+        out.append({"name": name, "rows": rows})
+    return {"fields": out, "equivalent_mps_per_hz": s.wavelength_m / 2.0}
+
+
 # ----------------------------------------------------------------------------- all of them
 @lru_cache(maxsize=1)
 def build() -> dict:
     s = config.setup()
     bench = _bench(s)
     return {"setup": s, "limiter": limiter(s, bench), "gains": gain_settings(s, bench), "beyond": beyond_window(s, bench),
-            "fast": fast_targets(s, bench), "adc": undithered_adc(s, bench), "leak": leakage_paths(s, bench)}
+            "fast": fast_targets(s, bench), "adc": undithered_adc(s, bench), "leak": leakage_paths(s, bench),
+            "lo": same_lo(s, bench), "sync": bistatic_sync(s, bench)}
 
 
 def _f(v, fmt="{:.2f}") -> str:
@@ -425,4 +508,33 @@ def render(t: dict | None = None) -> str:
     w(f"      isolation for 1 dB: {rf['need_pn_alone_db']:.1f} dB without it; {rf['need_pn_db']:.1f} dB with it at this phase; {rf['need_pn_min_db']:.1f} ... {rf['need_pn_max_db']:.1f} dB "
       f"over the phase between the paths, {rf['need_pn_average_db']:.1f} dB on average")
     w(f"      floor rise with it: closed {rf['rise_closed_db']:.2f} dB / simulated {rf['rise_sim_db']:.2f} dB (without it: {rf['rise_alone_closed_db']:.2f} dB)")
+    w("")
+    lo = t["lo"]
+    w("== 7. every row on one LO: mmw60_trx's x10 LO in the place of each row's own (the table keeps fmcw_radar's default config; ROADMAP item 6) ==")
+    for k, label in (("default", "A   fmcw_radar's default config"), ("x10lo", "A'  its radar_60g_x10lo.yaml")):
+        r = lo["row_a"][k]
+        w(f"  {label:32s} SNR(cell) {r['snr_cell_db']:.2f} dB; LO {r['lo_rms_rad']:.3f} rad rms; phase-noise floor of the map: mean {r['pn_mean_cell_dbc']:.1f} dBc, "
+          f"at the target {r['pn_local_cell_dbc']:.1f} dBc   ({r['lo_source']})")
+    w(f"  the ay rows (communication limit; floor rises at {lo['isolation_db']:g} dB of isolation for B, on the direct path for C):")
+    w(f"{'LO':>44s} {'L(1 MHz)':>10s} {'L(100 MHz)':>11s} {'B: residue':>12s} {'isolation for 1 dB':>20s} {'of all three':>14s} {'floor rise closed / sim':>26s} "
+      f"{'C, L-CEF: closed / sim':>24s} {'C, TRN field: closed / sim':>28s}")
+    for r in lo["rows"]:
+        c0, c1 = r["bistatic"]
+        w(f"{r['lo']:>44s} {r['at_1mhz_dbchz']:10.1f} {r['at_100mhz_dbchz']:11.1f} {r['residual_dbc']:8.1f} dBc {r['need_pn_db']:17.1f} dB {r['need_db']:11.1f} dB "
+          f"{r['rise_closed_db']:15.2f} / {r['rise_sim_db']:.2f} dB {c0['rise_closed_db']:13.2f} / {c0['rise_sim_db']:.2f} dB {c1['rise_closed_db']:17.2f} / {c1['rise_sim_db']:.2f} dB")
+    for r in lo["rows"]:
+        c0, c1 = r["bistatic"]
+        w(f"      {r['lo']}: B is bound by {r['binding']}; C's residue {c0['residual_dbc']:.1f} dBc, the phase noise less its mean over one correlation window "
+          f"({c0['reference_s'] * 1e6:.2f} us); taken over the whole correlated span instead the closed form would say {c0['rise_whole_field_closed_db']:.2f} dB "
+          f"(L-CEF, {c0['span_s'] * 1e6:.2f} us) and {c1['rise_whole_field_closed_db']:.2f} dB (TRN field, {c1['span_s'] * 1e6:.2f} us)")
+    w("")
+    sy = t["sync"]
+    w("== 8. the bistatic rows: the carrier offset the two devices are left with (one frame, no noise; every packet's phase taken from the direct path; ROADMAP item 7) ==")
+    for f in sy["fields"]:
+        w(f"  {f['name']}:")
+        w(f"{'offset':>16s} {'as a velocity':>16s} {'turns across the field':>24s} {'the target loses: closed':>26s} {'simulated':>12s}")
+        for r in f["rows"]:
+            w(f"{r['cfo_hz'] / 1e3:12.0f} kHz {r['cfo_hz'] * sy['equivalent_mps_per_hz']:12.1f} m/s {r['turns']:24.3f} {r['loss_closed_db']:23.4f} dB {r['loss_sim_db']:9.4f} dB")
+    w("  between packets nothing is left: the offset is common to the target and to the direct path the phase is read on; inside a packet it is the fast target's loss of section 4, "
+      "the offset added to the target's own Doppler")
     return "\n".join(L) + "\n"

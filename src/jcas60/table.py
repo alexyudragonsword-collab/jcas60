@@ -273,7 +273,7 @@ def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
     near = int(round(g.delay_s * bench.sim.fs))
     lin = bench.read([tgt, st], bench.options("bistatic"), near)
     pn = bench.read([tgt, st], bench.options("bistatic", lo="independent"), near)
-    res = B.pn_residual_independent(s, s.field.n_correlated / s.chip_rate_hz.value)
+    res = B.pn_residual_independent(s, len(s.field.windows[0][1]) / s.chip_rate_hz.value)      # one window: see the function
     comp = B.compression(bench.sim.unit_envelope(st.delay_s), direct.value, s)
     return {"reading": reading.name, "direct_dbm": direct, "comp_snr_closed_db": comp["snr"], "comp_image_closed_dbc": comp["image"] - comp["signal"],
             "enob_needed": derive(B.enob_required(direct.value, link.noise_chip_dbm.value, s), "ENOB for the quantisation noise to cost the allowed desensitisation",
@@ -554,7 +554,7 @@ def render(t: dict | None = None) -> str:
       f"{s.trn_field.chips.size / s.chip_rate_hz.value * 1e6:.1f} us of TRN field a packet instead of {s.field.chips.size / s.chip_rate_hz.value * 1e6:.2f} us of L-CEF")
     for blk in t["bistatic"]:
         w(f"  C, {blk['reading']}: direct path {blk['direct_dbm'].value:.1f} dBm {blk['direct_dbm'].label}, {blk['under_p1db_db'].value:.1f} dB under the in-band P1dB; ENOB needed {blk['enob_needed'].value:.2f}; "
-          f"independent LOs after referencing to the direct path: residual {blk['pn_residual_dbc']:.1f} dBc, floor rise closed {blk['pn_rise_closed_db']:.2f} dB / simulated {blk['pn_rise_sim_db']:.2f} dB (SNR {blk['pn_snr_change_db']:+.2f} dB); "
+          f"independent LOs, every packet turned back by the direct path's phase: residue {blk['pn_residual_dbc']:.1f} dBc (the phase noise less its mean over one correlation window), floor rise closed {blk['pn_rise_closed_db']:.2f} dB / simulated {blk['pn_rise_sim_db']:.2f} dB (SNR {blk['pn_snr_change_db']:+.2f} dB); "
           f"compression at that level (closed form): SNR {blk['comp_snr_closed_db']:+.3f} dB, image bound {blk['comp_image_closed_dbc']:.1f} dBc")
     w("     C pays elsewhere: the two devices share no clock, so every packet's phase is taken from the direct path (simulated) and its timing and carrier offset from the preamble (not simulated)")
     w("")

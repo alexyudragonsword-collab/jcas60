@@ -248,8 +248,12 @@ def inpacket_loss_db(s: Setup, field, path_rate_mps: float) -> float:
 
 
 def pn_residual_independent(s: Setup, t_ref_s: float) -> float:
-    """The same for two independent LOs (bistatic), after the receiver takes out the phase it reads on the direct
-    path over ``t_ref_s`` (the correlated field): Int 2 S_phi(f) (1 - sinc^2(f T)) W(f) df, both sidebands."""
+    """The same for two independent LOs (bistatic): Int 2 S_phi(f) (1 - sinc^2(f T)) W(f) df, both sidebands -- the
+    phase noise less its mean over ``t_ref_s``.  T is one correlation window, not the whole field: a window's
+    correlations cancel on their own (each is a complementary unit), so a phase that is constant over a window puts
+    nothing off the peak whatever it is from window to window; only what moves inside a window does.  (The receiver's
+    own referencing, the phase it reads on the direct path over the whole field, removes less than that and does not
+    set the floor.)"""
     f = _pn_grid(s)
     y = 2.0 * undb_arr(s.fe.pn_dbchz(f)) * (1.0 - np.sinc(f * t_ref_s) ** 2) * overlap_weight(f, s)
     return 2.0 * float(np.trapezoid(y, f))
