@@ -62,6 +62,43 @@ def width_at_half_power_chips(alpha: float) -> float:
     return 2.0 * lo
 
 
+def range_window_gain(f, alpha: float, name: str | None):
+    """A range window across the occupied band, at ``f`` in units of the chip rate: fmcw_radar's window ``name``
+    (the one its range FFT uses) laid over |f| <= (1 + alpha) / 2, zero outside.  None or "rect": no window."""
+    f = np.asarray(f, dtype=float)
+    half = (1.0 + alpha) / 2.0
+    if name in (None, "rect"):
+        return (np.abs(f) <= half).astype(float)
+    n = 4001
+    w = window(name, n)                                       # periodic: one period over the band
+    x = (f + half) / (2.0 * half)
+    return np.where((x >= 0.0) & (x <= 1.0), np.interp(x, np.arange(n + 1) / n, np.append(w, w[0])), 0.0)
+
+
+def range_response(tau_chips, alpha: float, name: str | None = None) -> np.ndarray:
+    """|h(tau)|^2 / |h(0)|^2 of the correlation output with a range window: h(tau) = Int RC(f) W(f) e^{j 2 pi f tau} df."""
+    f = np.linspace(-1.0, 1.0, 4001)
+    g = rc_spectrum(f, alpha) * range_window_gain(f, alpha, name)
+    tau = np.atleast_1d(np.asarray(tau_chips, dtype=float))
+    h = np.trapezoid(g[None, :] * np.cos(2.0 * np.pi * f[None, :] * tau[:, None]), f, axis=1)
+    return (h / np.trapezoid(g, f)) ** 2
+
+
+def range_window_loss_db(alpha: float, name: str | None) -> float:
+    """What the window costs in SNR against the matched filter: (Int RC W)^2 / (Int RC W^2 . Int RC)."""
+    f = np.linspace(-1.0, 1.0, 4001)
+    rcs, w = rc_spectrum(f, alpha), range_window_gain(f, alpha, name)
+    return -db(np.trapezoid(rcs * w, f) ** 2 / (np.trapezoid(rcs * w * w, f) * np.trapezoid(rcs, f)))
+
+
+def doppler_response(offset_bins, name: str, n: int) -> np.ndarray:
+    """|W(k)|^2 / |W(0)|^2 of the slow-time window over ``n`` packets, ``k`` bins off the target (any real k)."""
+    w = window(name, n)
+    k = np.atleast_1d(np.asarray(offset_bins, dtype=float))
+    z = (w[None, :] * np.exp(-2j * np.pi * k[:, None] * np.arange(n)[None, :] / n)).sum(axis=1)
+    return np.abs(z / w.sum()) ** 2
+
+
 # ----------------------------------------------------------------------------- geometry
 @dataclass(frozen=True)
 class Geometry:

@@ -205,3 +205,55 @@ def test_the_leftover_carrier_offset_is_the_fast_targets_loss(st):
     t5 = {round(r["cfo_hz"]): r for r in trn["rows"]}[5000]
     assert 0.05 < t5["loss_closed_db"] < 0.11                                       # 5 kHz across the TRN field: under a tenth of a dB
     assert st["sync"]["equivalent_mps_per_hz"] * 5000 == pytest.approx(12.4, abs=0.05)
+
+
+# ----------------------------------------------------------------------------- 9. a range window
+def test_the_range_window_trades_sidelobes_for_width_on_both_roads(st):
+    rw = st["window"]
+    plain, hann = rw["cases"]
+    assert (rw["window"], plain["window"], hann["window"]) == ("hann", "none", "hann")          # row A's own window, by name
+    for c in (plain, hann):
+        assert c["sim"]["width_chips"] == pytest.approx(c["closed"]["width_chips"], rel=1e-3)
+        assert c["sim"]["sidelobe_db"] == pytest.approx(c["closed"]["sidelobe_db"], abs=0.05)
+        assert abs(c["loss_sim_db"] - c["loss_grid_closed_db"]) < 0.15
+        for m in c["masks"]:
+            assert m["sim_db"] == pytest.approx(m["closed_db"], abs=0.05)
+    assert plain["closed"]["width_chips"] == pytest.approx(0.8726, abs=1e-3) and plain["closed"]["sidelobe_db"] == pytest.approx(-14.3, abs=0.06)
+    assert hann["closed"]["width_chips"] == pytest.approx(1.197, abs=1e-3) and hann["closed"]["sidelobe_db"] == pytest.approx(-27.3, abs=0.06)
+    assert hann["loss_closed_db"] == pytest.approx(0.95, abs=0.006) and plain["loss_closed_db"] == pytest.approx(0.0, abs=1e-9)
+    assert hann["straddle_db"] < plain["straddle_db"]                               # the wider lobe straddles the lag grid better
+    wide = hann["sim"]["width_chips"] * rw["chip_m"]
+    assert wide / rw["row_a_width_m"] == pytest.approx(1.91, abs=0.01)             # like for like, not the 2.27 of the bandwidths
+    # past the main lobe the window buys 6-11 dB against a second target; inside 1.5 chips it costs
+    by = lambda c: {m["offset_chips"]: m["closed_db"] for m in c["masks"]}          # noqa: E731
+    assert by(hann)[1.5] > by(plain)[1.5] and all(by(hann)[k] < by(plain)[k] - 6.0 for k in (2.5, 3.5, 5.0, 8.0))
+
+
+def test_the_range_window_closed_forms():
+    import numpy as np
+
+    from jcas60 import budget
+    a = 0.25
+    assert budget.range_response(0.0, a)[0] == pytest.approx(1.0) and budget.range_response(1.0, a)[0] < 1e-6      # the raised cosine: zero at a chip
+    assert budget.range_response(np.array([0.3, 0.7]), a) == pytest.approx(budget.rc(np.array([0.3, 0.7]), a) ** 2, abs=1e-5)
+    assert budget.range_window_loss_db(a, None) == pytest.approx(0.0, abs=1e-9) and budget.range_window_loss_db(a, "hann") > 0.5
+    # the slow-time window: Hann's nulls on every bin past the first, its first sidelobe between bins 2 and 3
+    d = budget.doppler_response(np.array([0.0, 1.0, 2.0, 5.0, 2.5]), "hann", 64)
+    assert d[0] == pytest.approx(1.0) and d[1] == pytest.approx(0.25, abs=1e-9) and d[2] < 1e-25 and d[3] < 1e-25
+    assert 10 * np.log10(d[4]) == pytest.approx(-32.3, abs=0.3)
+
+
+# ----------------------------------------------------------------------------- 10. a second target
+def test_what_a_strong_target_leaves_in_doppler_and_a_static_reflector(st):
+    sec = st["second"]
+    static, moving = sec["doppler"]
+    assert static["off_bin"] == 0.0 and abs(moving["off_bin"]) > 0.1
+    for r in static["rows"]:                                                        # a static path: the rounding bound, on both roads
+        assert r["sim_db"] == r["closed_db"] < -200.0
+    for r in moving["rows"]:
+        assert abs(r["sim_db"] - r["closed_db"]) < 0.5
+    lv = [r["closed_db"] for r in moving["rows"]]
+    assert lv == sorted(lv, reverse=True) and lv[0] > -32.0 and lv[1] < -48.0     # the window's sidelobes, falling away
+    cl = sec["clutter"]
+    assert abs(cl["rise_sim_db"] - cl["rise_closed_db"]) < 0.2 and cl["rise_closed_db"] == pytest.approx(1.08, abs=0.006)
+    assert abs(cl["snr_linear_db"] - cl["snr_alone_db"]) < 0.1                     # an ideal LO: the reflector costs the mover nothing

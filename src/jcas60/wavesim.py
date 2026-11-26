@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .budget import Geometry, rc_spectrum
+from .budget import Geometry, range_window_gain, rc_spectrum
 from .config import Setup
 from .physconst import C0, db, undb
 from .vendor.fmcw_radar.link.compression import rapp as _rapp
@@ -82,11 +82,14 @@ class Frame:
 
 
 class Simulator:
-    def __init__(self, s: Setup, field=None, analog_osr: int | None = None):
+    def __init__(self, s: Setup, field=None, analog_osr: int | None = None, range_window: str | None = None):
         """``analog_osr``: samples per chip of everything ahead of the ADC (default: the ADC's own rate).  A limiter is
         an analogue thing: at the ADC's two samples a chip the envelope it acts on is under-sampled.  With a higher
         rate the field, the paths, the noise and the limiter are computed there, an ideal low-pass at the ADC's
-        Nyquist frequency follows, and the ADC samples as before."""
+        Nyquist frequency follows, and the ADC samples as before.
+
+        ``range_window``: a window across the occupied band on the receive side, after the matched filter (fmcw_radar's
+        by name, as its range FFT has one): lower range sidelobes for a wider main lobe and some SNR."""
         self.s = s
         self.field = f = s.field if field is None else field
         self.osr = int(s.adc_osr.value)
@@ -107,6 +110,7 @@ class Simulator:
         # a chip of unit amplitude -> a pulse whose matched-filter output peaks at 1: the impulse train carries
         # ``osr`` in its spectrum per unit chip amplitude, the two root filters multiply to the raised cosine
         self.tx_f = np.fft.fft(x) * self.rrc * math.sqrt(self.osr)
+        self.rx = self.rrc if range_window is None else self.rrc * range_window_gain(freq / s.chip_rate_hz.value, s.rolloff.value, range_window)
         self.tx_power = float(np.mean(np.abs(np.fft.ifft(self.tx_f)[self.start * self.osr:(self.start + f.chips.size) * self.osr]) ** 2))
         self.t = np.arange(self.n) / self.fs
         # the rate ahead of the ADC: the same arrays when it is the ADC's, the band-limited interpolation otherwise
@@ -178,7 +182,7 @@ class Simulator:
 
     def correlate(self, y: np.ndarray) -> np.ndarray:
         """Matched filter, then the summed cyclic correlations at every lag."""
-        zf = np.fft.fft(y) * self.rrc
+        zf = np.fft.fft(y) * self.rx
         if self._by_fft:                                           # sum_n z[n + lag] conj(t[n]) at every lag, the wanted ones picked out
             return np.fft.ifft(zf * self._tmpl_f)[self.lags % self.n] / self._norm
         z = np.fft.ifft(zf)
