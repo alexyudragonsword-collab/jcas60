@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Example 01: ten questions the comparison table raises (the ROADMAP's list, in its order).
+"""Example 01: eleven questions the comparison table raises (the ROADMAP's list, in its order).
 
 1. The receiver's compression is computed at the ADC's two samples a chip:
    what is it in continuous time, and how much rides on the limiter's knee?
@@ -14,10 +14,11 @@
 8. The bistatic rows' leftover carrier offset.
 9. A range window like row A's: width, sidelobes, SNR.
 10. What a strong target, or a static reflector, leaves where another target is.
+11. A waveform made for sensing in the TRN field's place.
 
     python examples/01_receiver_and_window.py
 
-About 135 s.  ``tools/example_drift.py`` compares the output with
+About 145 s.  ``tools/example_drift.py`` compares the output with
 ``examples/expected/01_receiver_and_window.txt``.
 """
 import sys

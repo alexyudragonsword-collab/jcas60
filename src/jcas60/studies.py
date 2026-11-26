@@ -35,6 +35,9 @@ where it draws a conclusion (law 4):
 10. :func:`second_target` -- what a strong target (or a static reflector)
     leaves at another target's place: in range, with and without that
     window; in Doppler; and through the LO's phase noise.
+11. :func:`designed_waveform` -- a waveform made for sensing in the TRN
+    field's place (the entries allow one, on four conditions): every block
+    correlated, the clean zone twice as long, against the standard subfield.
 """
 from __future__ import annotations
 
@@ -46,6 +49,7 @@ import numpy as np
 
 from . import budget as B
 from . import config
+from . import field as F
 from . import fmcw_row as A
 from . import frontend as FE
 from . import regulatory as R
@@ -187,6 +191,23 @@ def _ghost(profile: np.ndarray, delay: int, far: int) -> tuple[float, int]:
     return float(v[j]), int(lags[j])
 
 
+def _beyond_rows(s, prof, sim, delays, far) -> list:
+    """A target at each of ``delays`` chips: the strongest it shows on lags 0 .. ``far``, by the chips and simulated."""
+    chip0 = (-sim.lag_lo) % sim.osr                                  # the lag index of the chip-spaced lags
+    floor = undb(sim.rounding_dbc)                                   # under it a level is the arithmetic's rounding, not a reading
+    rows = []
+    for d in delays:
+        closed, lag = _ghost(prof, d, far)
+        cir = sim.frame([W.Path(0.0, d / s.chip_rate_hz.value, 0.0)], W.Options(noise=False, n_packets=1)).cir[0]
+        p = np.abs(cir[chip0:: sim.osr]) ** 2
+        lags = sim.lags[chip0:: sim.osr] // sim.osr
+        keep = (lags >= 0) & (lags <= far)
+        j = int(np.argmax(np.where(keep, p, 0.0)))
+        rows.append({"delay_chips": d, "range_m": d * s.chip_m, "level_closed": max(closed, floor), "lag_closed": lag if closed > floor else None,
+                     "level_sim": max(float(p[j]), floor), "lag_sim": int(lags[j]) if p[j] > floor else None})
+    return rows
+
+
 def beyond_window(s, bench) -> dict:
     delays = [int(d) for d in S.raw(KEY + "#beyond_delays_chips")]
     margin = int(S.num(KEY + "#floor_margin_chips").value)
@@ -197,18 +218,7 @@ def beyond_window(s, bench) -> dict:
         far = field.zero_sidelobe_chips - margin
         prof = _chip_profile(field, max(delays) + field.zero_sidelobe_chips)
         sim = W.Simulator(long_buf, field)
-        chip0 = (-sim.lag_lo) % sim.osr                              # the lag index of the chip-spaced lags
-        rows = []
-        floor = undb(sim.rounding_dbc)                               # under it a level is the arithmetic's rounding, not a reading
-        for d in delays:
-            closed, lag = _ghost(prof, d, far)
-            cir = sim.frame([W.Path(0.0, d / s.chip_rate_hz.value, 0.0)], W.Options(noise=False, n_packets=1)).cir[0]
-            p = np.abs(cir[chip0:: sim.osr]) ** 2
-            lags = sim.lags[chip0:: sim.osr] // sim.osr
-            keep = (lags >= 0) & (lags <= far)
-            j = int(np.argmax(np.where(keep, p, 0.0)))
-            rows.append({"delay_chips": d, "range_m": d * s.chip_m, "level_closed": max(closed, floor), "lag_closed": lag if closed > floor else None,
-                         "level_sim": max(float(p[j]), floor), "lag_sim": int(lags[j]) if p[j] > floor else None})
+        rows = _beyond_rows(s, prof, sim, delays, far)
         # the worst a target anywhere past the window does, chip by chip (the chip road alone: it is exact)
         worst = max(((_ghost(prof, d, far)[0], d) for d in range(field.zero_sidelobe_chips + 1, max(delays) + 1)))
         out["fields"].append({"name": name, "window_chips": field.zero_sidelobe_chips, "window_m": field.zero_sidelobe_chips * s.chip_m,
@@ -494,6 +504,55 @@ def second_target(s, bench) -> dict:
     return out
 
 
+# ----------------------------------------------------------------------------- 11. a waveform made for sensing
+def _psd_10mhz(s, chips, width_hz) -> np.ndarray:
+    """The chips' power spectrum averaged over ``width_hz`` (a running mean around each frequency), on a fine grid."""
+    n = 1 << int(math.ceil(math.log2(chips.size))) + 1
+    p = np.abs(np.fft.fft(chips, n)) ** 2
+    m = max(1, int(round(width_hz / (s.chip_rate_hz.value / n))))
+    c = np.cumsum(np.concatenate([p[-m:], p, p[:m]]))
+    return (c[2 * m:] - c[:-2 * m])[: n] / (2 * m)
+
+
+def designed_waveform(s, bench) -> dict:
+    std, new = s.trn_field, F.designed(int(s.trn_units.value))
+    n = int(S.num("edmg.trn_field#trn_bl@trn_seq_length=normal").value)
+    eirp = R.readings(s)[0].eirp_dbm
+    items = list(S.raw("jcas60.sensing_waveform#pattern"))
+    kinds = [x.strip("+-") for x in items]
+    run = max(sum(1 for _ in g) for g in (list(v) for _, v in __import__("itertools").groupby(kinds * 2)))
+    width = S.num("ieee80211bf.dmg_monostatic_ppdu#trn_waveform_psd_average_hz").value
+    ratio = db(1.0) + 10.0 * np.log10(_psd_10mhz(s, new.chips, width) / _psd_10mhz(s, std.chips, width))
+    conditions = {"length_chips": (int(new.chips.size), int(std.chips.size)), "modulus_max_error": float(np.abs(np.abs(new.chips) - 1.0).max()),
+                  "consecutive_same_sequence": (run, int(S.num("ieee80211bf.dmg_monostatic_ppdu#max_consecutive_ga128").value)),
+                  "psd_average_hz": width, "psd_excess_max_db": float(ratio.max()), "psd_excess_min_db": float(ratio.min()),
+                  "psd_total_db": db(float(np.sum(np.abs(new.chips) ** 2) / np.sum(np.abs(std.chips) ** 2)))}
+    sim = W.Simulator(s, new)
+    req = A.rep("detection.range_at_pd.snr_required_db", unit="dB")
+    rows = []
+    for name, field, fsim in (("standard TRN subfield, blocks 2-5", std, bench.sim_trn), ("designed, every block", new, sim)):
+        link = B.link(s, "monostatic", eirp, field=field)
+        g, tgt, _ = bench.paths("monostatic", link, 0.0)
+        strong = T.strong_path_dbm(s, "monostatic", eirp, s.fe.isolation_db[-1][1])
+        got = bench.read([tgt, _leak(s, strong.value)], bench.options("monostatic"), int(round(g.delay_s * fsim.fs)), sim=fsim)
+        golay = T.golay_under_doppler(s, bench, (0.0, s.velocity_mps.value), fsim, field.chips.size)
+        rows.append({"name": name, "correlated_chips": field.n_correlated, "clean_chips": field.zero_sidelobe_chips, "clean_m": field.zero_sidelobe_chips * s.chip_m,
+                     "snr_cell_db": link.snr_cell_db.value, "snr_grid_db": link.snr_grid_db.value, "snr_sim_db": got["snr_db"],
+                     "range_snr_m": B.detection_range_m(s, "monostatic", eirp, req, field).value,
+                     "sidelobe_rest_dbc": golay[0][1], "sidelobe_moving_dbc": golay[1][1],
+                     "inpacket_loss_db": -B.inpacket_loss_db(s, field, 2.0 * s.wavelength_m / (4.0 * s.interval_s.value))})
+    margin = int(S.num(KEY + "#floor_margin_chips").value)
+    delays = [int(d) for d in S.raw(KEY + "#beyond_delays_chips")]
+    far = new.zero_sidelobe_chips - margin
+    prof = _chip_profile(new, max(delays) + new.zero_sidelobe_chips + n * len(items))
+    beyond = _beyond_rows(s, prof, sim, delays, far)
+    k = np.arange(-(prof.size - 1), 1)
+    zones = [{"from_chips": a, "to_chips": b, "level": max(float(prof[(k <= -a) & (k >= -b)].max()), undb(sim.rounding_dbc))}
+             for a, b in ((1, new.zero_sidelobe_chips), (new.zero_sidelobe_chips + 1, n * (len(items) - 2)), (n * len(items), n * len(items)))]
+    return {"pattern": items, "guard_blocks": int(S.num("jcas60.sensing_waveform#guard_blocks").value), "period_chips": n * len(items),
+            "conditions": conditions, "rows": rows, "beyond": beyond, "read_to_chips": far, "zones": zones, "gain_db": db(new.n_correlated / std.n_correlated)}
+
+
 # ----------------------------------------------------------------------------- all of them
 @lru_cache(maxsize=1)
 def build() -> dict:
@@ -501,7 +560,8 @@ def build() -> dict:
     bench = _bench(s)
     return {"setup": s, "limiter": limiter(s, bench), "gains": gain_settings(s, bench), "beyond": beyond_window(s, bench),
             "fast": fast_targets(s, bench), "adc": undithered_adc(s, bench), "leak": leakage_paths(s, bench),
-            "lo": same_lo(s, bench), "sync": bistatic_sync(s, bench), "window": range_window(s, bench), "second": second_target(s, bench)}
+            "lo": same_lo(s, bench), "sync": bistatic_sync(s, bench), "window": range_window(s, bench), "second": second_target(s, bench),
+            "designed": designed_waveform(s, bench)}
 
 
 def _f(v, fmt="{:.2f}") -> str:
@@ -662,4 +722,27 @@ def render(t: dict | None = None) -> str:
     w(f"  a static reflector {cl['over_target_db']:g} dB over the target, at {cl['range_m']:g} m ({cl['level_dbm']:.1f} dBm): linear receiver and ideal LO, the target's SNR is "
       f"{cl['snr_linear_db']:.2f} dB (alone: {cl['snr_alone_db']:.2f} dB); with the shared LO's phase noise (residue {cl['residual_dbc']:.1f} dBc at that delay) the floor rises "
       f"{cl['rise_closed_db']:.2f} dB closed / {cl['rise_sim_db']:.2f} dB simulated")
+    w("")
+    dw = t["designed"]
+    cd = dw["conditions"]
+    w("== 11. a waveform made for sensing in the TRN field's place (jcas60.sensing_waveform; the entry ieee80211bf.dmg_monostatic_ppdu allows one on four conditions; ROADMAP item 12) ==")
+    w(f"  one period: {' '.join(dw['pattern'])} ({dw['period_chips']} chips); {dw['guard_blocks']} guard blocks at each end, every block between them correlated")
+    w(f"{'':>36s} {'correlated chips':>18s} {'clean zone':>22s} {'SNR(cell)':>11s} {'on the grid: closed':>21s} {'simulated':>10s} {'range at Pd 0.9 by SNR':>24s} "
+      f"{'sidelobes at rest':>19s} {'at 2 m/s':>10s} {'in-packet loss at v_max':>25s}")
+    for r in dw["rows"]:
+        w(f"{r['name']:>36s} {r['correlated_chips']:18d} {r['clean_chips']:6d} chips = {r['clean_m']:5.2f} m {r['snr_cell_db']:8.2f} dB {r['snr_grid_db']:18.2f} dB "
+          f"{r['snr_sim_db']:7.2f} dB {r['range_snr_m']:22.2f} m {r['sidelobe_rest_dbc']:15.1f} dBc {r['sidelobe_moving_dbc']:6.1f} dBc {r['inpacket_loss_db']:22.3f} dB")
+    w(f"  the entry's conditions: length {cd['length_chips'][0]} chips against the TRN field's {cd['length_chips'][1]}: fits; power over every 128 Tc: the same (unit modulus, "
+      f"worst error {cd['modulus_max_error']:.0e}): fits; at most {cd['consecutive_same_sequence'][1]} of one sequence in a row: {cd['consecutive_same_sequence'][0]}: fits")
+    w(f"      spectral density averaged over {cd['psd_average_hz'] / 1e6:g} MHz, no higher than the TRN field's: {cd['psd_excess_max_db']:+.2f} dB at the worst frequency "
+      f"({cd['psd_excess_min_db']:+.2f} dB at the best, {cd['psd_total_db']:+.2f} dB in all): does not fit as built -- the excess is where the TRN field's own spectrum dips")
+    w(f"      backed off by that {cd['psd_excess_max_db']:.2f} dB it fits, and the {dw['gain_db']:.2f} dB of more chips become {dw['gain_db'] - cd['psd_excess_max_db']:+.2f} dB against the standard subfield; "
+      "the longer clean zone and what follows do not depend on the level")
+    w("  what a target leaves for a lag this many chips from it, either side (the chips alone; rounding bound = exact cancellation): "
+      + "; ".join(f"{z['from_chips']}" + ("" if z['from_chips'] == z['to_chips'] else f"-{z['to_chips']}") + f": {db(z['level']):.1f} dB" for z in dw["zones"]))
+    w(f"{'target at [chips]':>20s} {'range [m]':>10s} {'strongest on lags 0-' + str(dw['read_to_chips']) + ': chips road':>38s} {'simulation':>12s}")
+    for r in dw["beyond"]:
+        w(f"{r['delay_chips']:20d} {r['range_m']:10.2f} {db(r['level_closed']):35.1f} dB {db(r['level_sim']):9.1f} dB")
+    w("  against section 3: the standard subfield shows a target 256 chips past its place 6.1 dB down and folds at 768 chips; this one is clean to 256 chips, "
+      "noise-like about 21 dB down from there to 768, and folds at 1024 chips")
     return "\n".join(L) + "\n"

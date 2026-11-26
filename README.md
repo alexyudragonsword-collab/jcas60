@@ -7,7 +7,7 @@
 ```
 pip install -e ".[test]"
 python examples/00_comparison_table.py     # 对照表，约 70 s
-python examples/01_receiver_and_window.py  # 表引出的十个问题：限幅器、增益档、窗外的目标、快目标、粗 ADC、泄漏的时延、同一个本振、双站的频偏、距离窗、第二个目标，约 135 s
+python examples/01_receiver_and_window.py  # 表引出的十一个问题：限幅器、增益档、窗外的目标、快目标、粗 ADC、泄漏的时延、同一个本振、双站的频偏、距离窗、第二个目标、为感知设计的 TRN 波形，约 145 s
 pytest && ruff check src tests tools examples
 ```
 
