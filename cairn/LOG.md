@@ -3,6 +3,13 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短（摘要 + 指针），
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-26 · 预期：spec_sources 的 pin 跟到 98b1d1b（feat/repin-spec-sources-98b1d1b；跑之前写）
+
+**漏读的一条**：spec_sources#59 里对方 14:28 补了一条评论（可以直接 pin 到 `98b1d1b`，为 fmcw_radar#46 合并的），我 15:02 回报验收、关 issue 之前没有重读评论，pin 停在了 `da54721`。用户问起才发现。以后关 issue、开 PR 之前重读一遍评论。
+
+- 两个 pin 之间本库 vendor 的 6 个文件只有 `data/regulatory.yaml` 变：新增 `fcc15255.radar_occupied_bandwidth` 与 `fcc2.occupied_bandwidth`（占用带宽按 §2.1049 实测、每侧 0.5 %；FCC 23-35 第 62 段，没有写进条文），`fcc15255.radar_61_61p5` 的 note 多一句。
+- **预期**：P1 `vendor_check --strict` 仍 21 个文件全 verbatim。P2 指纹 2529 个值一个不动，连文本哈希也不动——本库不读这两条新条目，也不打印那条 note；示例的期望输出逐字不变。P3 `fcc2.` 是共享表里的新前缀，本库的铁律 1 测试只要求 `jcas60.*` 不出现在共享表里，不受影响。
+
 ## 2026-11-26 · 结果：重新 pin spec_sources@da54721，用上 #59 的答复（feat/repin-spec-sources-59）
 
 预期在下一条（`fd35a2b`）。数字在示例 01 §12–14（现在约 170 s），结论在 `cairn/comparison-table.md` 的三段“#59 之后”。对照表的行与数没有动。
