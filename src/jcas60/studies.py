@@ -30,6 +30,11 @@ where it draws a conclusion (law 4):
    with that LO's profile in the place of the model.
 8. :func:`bistatic_sync` -- what the two devices' leftover carrier offset
    costs inside a packet, and the direct path's phase noise on the TRN field.
+9. :func:`range_window` -- the range response with the window row A's range
+   FFT has: width, sidelobes, SNR, on both roads.
+10. :func:`second_target` -- what a strong target (or a static reflector)
+    leaves at another target's place: in range, with and without that
+    window; in Doppler; and through the LO's phase noise.
 """
 from __future__ import annotations
 
@@ -396,6 +401,99 @@ def bistatic_sync(s, bench) -> dict:
     return {"fields": out, "equivalent_mps_per_hz": s.wavelength_m / 2.0}
 
 
+# ----------------------------------------------------------------------------- 9. a range window
+def _response_sim(s, sim, offsets) -> np.ndarray:
+    """The range response at ``offsets`` chips from a target, normalised to its peak: one lag's reading as a
+    noise-free target is moved the other way (the lag grid is half a chip; the target is not bound to it)."""
+    g = B.geometry(s, "monostatic")
+    chips = round(g.delay_s * s.chip_rate_hz.value)
+    j = chips * sim.osr - sim.lag_lo
+    p = np.array([abs(sim.frame([W.Path(0.0, (chips - d) / s.chip_rate_hz.value, 0.0)], W.Options(noise=False, n_packets=1)).cir[0][j]) ** 2
+                  for d in offsets])
+    return p / p[0]
+
+
+def _shape(offsets, resp) -> dict:
+    """-3 dB width (both sides) and the highest sidelobe past the first null, from a response sampled from 0 outward."""
+    half = float(np.interp(0.5, resp[::-1][-np.argmax(resp < 0.5) - 1:][:2], offsets[::-1][-np.argmax(resp < 0.5) - 1:][:2])) \
+        if np.any(resp < 0.5) else float("nan")
+    k = 1
+    while k < len(resp) - 1 and resp[k + 1] < resp[k]:
+        k += 1                                                   # the first minimum
+    return {"width_chips": 2.0 * half, "sidelobe_db": db(float(resp[k:].max())), "first_null_chips": float(offsets[k])}
+
+
+def range_window(s, bench) -> dict:
+    name = A.get("radar.range_window")
+    step = S.num(KEY + "#scan_step_chip").value
+    marks = [float(x) for x in S.raw(KEY + "#mask_offsets_chips")]
+    offsets = np.arange(0.0, max(marks) + 1.0 + step / 2, step)
+    eirp = R.readings(s)[0].eirp_dbm
+    link = B.link(s, "monostatic", eirp)
+    g, tgt, _ = bench.paths("monostatic", link, 0.0)
+    cases, snr0 = [], None
+    off_grid = abs(g.delay_s * s.chip_rate_hz.value * s.adc_osr.value - round(g.delay_s * s.chip_rate_hz.value * s.adc_osr.value)) / s.adc_osr.value
+    straddle = lambda w: -db(float(B.range_response(off_grid, s.rolloff.value, w)[0]))      # noqa: E731  what the lag grid takes off this target's peak
+    for w in (None, name):
+        sim = bench.sim if w is None else W.Simulator(s, range_window=w)
+        closed, got = B.range_response(offsets, s.rolloff.value, w), _response_sim(s, sim, offsets)
+        snr = bench.read([tgt], bench.options("monostatic"), int(round(g.delay_s * sim.fs)), strong=(), sim=sim)["snr_db"]
+        snr0 = snr if snr0 is None else snr0
+        masks = [{"offset_chips": m, "closed_db": db(float(closed[np.abs(offsets - m) <= 0.5].max())), "sim_db": db(float(got[np.abs(offsets - m) <= 0.5].max()))}
+                 for m in marks]
+        cases.append({"window": w or "none", "closed": _shape(offsets, closed), "sim": _shape(offsets, got),
+                      "loss_closed_db": B.range_window_loss_db(s.rolloff.value, w), "straddle_db": straddle(w),
+                      "loss_grid_closed_db": B.range_window_loss_db(s.rolloff.value, w) + straddle(w) - straddle(None), "loss_sim_db": snr0 - snr, "masks": masks})
+    return {"window": name, "cases": cases, "chip_m": s.chip_m, "off_grid_chips": off_grid, "row_a_width_m": A.get("radar.range_res_m"), "row_a_sidelobe_db": A.get("radar.window_sidelobe_db")}
+
+
+# ----------------------------------------------------------------------------- 10. a second target, a static reflector
+def second_target(s, bench) -> dict:
+    sim = bench.sim
+    eirp = R.readings(s)[0].eirp_dbm
+    link = B.link(s, "monostatic", eirp)
+    g, tgt, _ = bench.paths("monostatic", link, 0.0)
+    m = int(s.n_packets.value)
+    chips = round(g.delay_s * s.chip_rate_hz.value)
+    j = chips * sim.osr - sim.lag_lo
+    bins = [int(b) for b in S.raw(KEY + "#doppler_offsets_bins")]
+    floor = sim.rounding_dbc
+
+    def doppler_row(v):
+        """The map's row through a noise-free target on a chip at velocity ``v``, normalised to its strongest cell."""
+        p = sim.frame([W.Path(0.0, chips / s.chip_rate_hz.value, 2.0 * v)], W.Options(noise=False)).power[:, j]
+        return p / p.max(), int(np.argmax(p))
+    out = {"doppler": []}
+    dv = s.wavelength_m / (2.0 * m * s.interval_s.value)                      # one Doppler bin, in m/s
+    for label, v in (("static", 0.0), ("moving", s.velocity_mps.value)):
+        row, i0 = doppler_row(v)
+        frac = v / dv - round(v / dv)                                         # how far off its bin's centre the target sits
+        k = np.arange(m) - i0
+        k = (k + m // 2) % m - m // 2                                         # circular offset from the peak's bin
+        rows = []
+        for b in bins:
+            far = np.abs(k) >= b
+            # the target's Doppler is -2v/lambda (receding): bin offsets from its true place are k + frac
+            closed = float(B.doppler_response(k[far] + frac, s.doppler_window, m).max())
+            rows.append({"beyond_bins": b, "closed_db": max(db(closed + 1e-40), floor), "sim_db": max(db(float(row[far].max()) + 1e-40), floor)})
+        out["doppler"].append({"what": label, "velocity_mps": v, "off_bin": frac, "rows": rows})
+    # a static reflector far stronger than the target: what its phase noise puts on the floor (shared LO)
+    over, rng_m = S.num(KEY + "#clutter_over_target_db").value, S.num(KEY + "#clutter_range_m").value
+    gc = B.geometry(s, "monostatic", rng_m)
+    level = link.p_rx_dbm.value + over
+    clutter = W.Path(level, gc.delay_s, 0.0, "reflector")
+    near = int(round(g.delay_s * sim.fs))
+    strong = (int(round(gc.delay_s * sim.fs)),)
+    lin = bench.read([tgt, clutter], bench.options("monostatic"), near, strong=strong)
+    pn = bench.read([tgt, clutter], bench.options("monostatic", lo="shared"), near, strong=strong)
+    res = B.pn_residual_shared(s, gc.delay_s)
+    out["clutter"] = {"over_target_db": over, "range_m": rng_m, "level_dbm": level, "residual_dbc": db(res),
+                      "rise_closed_db": B.floor_rise_db(level + db(res), link.noise_chip_dbm.value), "rise_sim_db": pn["floor_dbm"] - lin["floor_dbm"],
+                      "snr_linear_db": lin["snr_db"], "snr_alone_db": bench.read([tgt], bench.options("monostatic"), near, strong=())["snr_db"]}
+    out["bin_mps"] = dv
+    return out
+
+
 # ----------------------------------------------------------------------------- all of them
 @lru_cache(maxsize=1)
 def build() -> dict:
@@ -403,7 +501,7 @@ def build() -> dict:
     bench = _bench(s)
     return {"setup": s, "limiter": limiter(s, bench), "gains": gain_settings(s, bench), "beyond": beyond_window(s, bench),
             "fast": fast_targets(s, bench), "adc": undithered_adc(s, bench), "leak": leakage_paths(s, bench),
-            "lo": same_lo(s, bench), "sync": bistatic_sync(s, bench)}
+            "lo": same_lo(s, bench), "sync": bistatic_sync(s, bench), "window": range_window(s, bench), "second": second_target(s, bench)}
 
 
 def _f(v, fmt="{:.2f}") -> str:
@@ -537,4 +635,31 @@ def render(t: dict | None = None) -> str:
             w(f"{r['cfo_hz'] / 1e3:12.0f} kHz {r['cfo_hz'] * sy['equivalent_mps_per_hz']:12.1f} m/s {r['turns']:24.3f} {r['loss_closed_db']:23.4f} dB {r['loss_sim_db']:9.4f} dB")
     w("  between packets nothing is left: the offset is common to the target and to the direct path the phase is read on; inside a packet it is the fast target's loss of section 4, "
       "the offset added to the target's own Doppler")
+    w("")
+    rw = t["window"]
+    w(f"== 9. a range window: row A's ({rw['window']}) across the occupied band, after the matched filter (ROADMAP item 10) ==")
+    w(f"{'window':>10s} {'-3 dB width: closed':>22s} {'simulated':>12s} {'in range':>10s} {'highest sidelobe: closed':>26s} {'simulated':>10s} {'SNR lost at the peak':>22s} {'on the lag grid: closed':>25s} {'simulated':>10s}")
+    for c in rw["cases"]:
+        w(f"{c['window']:>10s} {c['closed']['width_chips']:16.3f} chips {c['sim']['width_chips']:6.3f} chips {c['sim']['width_chips'] * rw['chip_m'] * 100:7.2f} cm "
+          f"{c['closed']['sidelobe_db']:23.1f} dB {c['sim']['sidelobe_db']:7.1f} dB {c['loss_closed_db']:19.2f} dB {c['loss_grid_closed_db']:22.2f} dB {c['loss_sim_db']:7.2f} dB")
+    wide = rw["cases"][-1]["sim"]["width_chips"] * rw["chip_m"]
+    w(f"  row A: {rw['row_a_width_m'] * 100:.2f} cm with the same window, sidelobes {rw['row_a_sidelobe_db']:.1f} dB; like for like the ay rows are "
+      f"{wide / rw['row_a_width_m']:.2f} times as wide (without a window on either side the bandwidths give 2.27)")
+    w(f"  on the lag grid the window costs less than at the peak: this target sits {rw['off_grid_chips']:.2f} chip off a lag, and a wider main lobe loses less there "
+      f"({rw['cases'][0]['straddle_db']:.2f} dB without the window, {rw['cases'][-1]['straddle_db']:.2f} dB with it)")
+    w("  what a target leaves for a second one at the same velocity (the highest level within half a chip of each offset):")
+    w(f"{'offset [chips]':>16s} " + " ".join(f"{c['window'] + ': closed / simulated':>30s}" for c in rw["cases"]))
+    for k, mk in enumerate(rw["cases"][0]["masks"]):
+        w(f"{mk['offset_chips']:16.1f} " + " ".join(f"{c['masks'][k]['closed_db']:19.1f} / {c['masks'][k]['sim_db']:6.1f} dB" for c in rw["cases"]))
+    w("")
+    st2 = t["second"]
+    w(f"== 10. what a strong target leaves in Doppler, and a static reflector (one frame, no noise; a Doppler bin is {st2['bin_mps']:.2f} m/s; ROADMAP item 9) ==")
+    w(f"{'the strong one':>16s} {'off its bin':>12s} " + " ".join(f"{'beyond ' + str(r['beyond_bins']) + ' bins: closed / sim':>34s}" for r in st2["doppler"][0]["rows"]))
+    for d in st2["doppler"]:
+        w(f"{d['what'] + ' ' + format(d['velocity_mps'], 'g') + ' m/s':>16s} {d['off_bin']:+12.2f} " + " ".join(f"{r['closed_db']:23.1f} / {r['sim_db']:6.1f} dB" for r in d["rows"]))
+    w("  a static path sits on a bin and the window's nulls fall on every other bin: past the main lobe it leaves the arithmetic's rounding; a mover is off its bin and leaves the window's sidelobes")
+    cl = st2["clutter"]
+    w(f"  a static reflector {cl['over_target_db']:g} dB over the target, at {cl['range_m']:g} m ({cl['level_dbm']:.1f} dBm): linear receiver and ideal LO, the target's SNR is "
+      f"{cl['snr_linear_db']:.2f} dB (alone: {cl['snr_alone_db']:.2f} dB); with the shared LO's phase noise (residue {cl['residual_dbc']:.1f} dBc at that delay) the floor rises "
+      f"{cl['rise_closed_db']:.2f} dB closed / {cl['rise_sim_db']:.2f} dB simulated")
     return "\n".join(L) + "\n"
