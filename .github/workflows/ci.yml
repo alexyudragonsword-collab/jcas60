@@ -75,7 +75,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alexyudragonsword-collab/fmcw_radar
-          ref: c303566180c2ef22bd2bf6ffaa1f08e59174e110
+          ref: d1c48bd972fabc693517a30d976ac85feda3739c
           path: _siblings/fmcw_radar
       - uses: actions/setup-python@v5
         with:

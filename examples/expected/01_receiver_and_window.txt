@@ -147,8 +147,8 @@ sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11
 == 11. a waveform made for sensing in the TRN field's place (jcas60.sensing_waveform; the entry ieee80211bf.dmg_monostatic_ppdu allows one on four conditions; ROADMAP item 12) ==
   one period: +Ga_N +Gb_N +Ga_N -Gb_N +Ga_N +Gb_N -Ga_N +Gb_N (1024 chips); 4 guard blocks at each end, every block between them correlated
                                        correlated chips             clean zone   SNR(cell)   on the grid: closed  simulated   range at Pd 0.9 by SNR   sidelobes at rest   at 2 m/s   in-packet loss at v_max
-   standard TRN subfield, blocks 2-5              20480    128 chips = 10.90 m    43.75 dB              42.88 dB   42.85 dB                  29.41 m          -216.7 dBc  -84.4 dBc                  0.109 dB
-               designed, every block              29696    256 chips = 21.80 m    45.37 dB              44.49 dB   44.49 dB                  32.12 m          -216.7 dBc  -80.1 dBc                  0.102 dB
+   standard TRN subfield, blocks 2-5              20480    128 chips = 10.90 m    43.75 dB              42.88 dB   42.85 dB                  30.12 m          -216.7 dBc  -84.4 dBc                  0.109 dB
+               designed, every block              29696    256 chips = 21.80 m    45.37 dB              44.49 dB   44.49 dB                  32.89 m          -216.7 dBc  -80.1 dBc                  0.102 dB
   the entry's conditions: length 30720 chips against the TRN field's 30720: fits; power over every 128 Tc: the same (unit modulus, worst error 0e+00): fits; at most 6 of one sequence in a row: 1: fits
       spectral density averaged over 10 MHz, no higher than the TRN field's: +1.86 dB at the worst frequency (-1.19 dB at the best, +0.00 dB in all): does not fit as built -- the excess is where the TRN field's own spectrum dips
       backed off by that 1.86 dB it fits, and the 1.61 dB of more chips become -0.25 dB against the standard subfield; the longer clean zone and what follows do not depend on the level

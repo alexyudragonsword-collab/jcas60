@@ -1,6 +1,6 @@
 engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; the receiver's compression is a memoryless limiter, the transmitter is linear) -- no AM/PM, no memory, no spur conclusions
 jcas60 0.1.0; milestone 0: sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11 holds what was checked against spec_sources' 802.11bf entries, item by item)
-one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, at the cell SNR fmcw_radar's report says its map's CA-CFAR needs, 12.24 [derived/assumed] dB, for every row (with the noise level known: 11.75 dB)
+one target for every row: a person at 5 [assumed] m receding at 2 [assumed] m/s, RCS -10 [spec] dBsm; detection: Pd 0.9 [assumed] at Pfa 0.0001 [assumed], Swerling 0, at the cell SNR each row's own map's CA-CFAR needs: row A 12.24 [derived/assumed] dB (its report), the ay rows 11.81 [derived/assumed] dB (with the noise level known: 11.75 dB)
 tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from spec numbers, [derived/assumed] computed from at least one assumed number
 
 == 0. the shared front-end numbers (one instance; row A's own inputs, from its report, beside them) ==
@@ -29,16 +29,18 @@ C  ay L-CEF, bistatic                     1.76 [spec] GHz 9.83 [derived/assumed]
 == 2. link: EIRP, processing gain, SNR of the person at 5 m, range at Pd 0.9 ==
 row                                               limit             EIRP [dBm]                          processing gain          window loss           SNR(cell) [dB]       Pd          range at Pd 0.9 (SNR)   within the clean range
 A  FMCW (fmcw_radar default)                radar limit 14.00 [derived/assumed] 48.06 [derived/assumed] dB = 1000 samples x 64 chirps 3.52 [derived/assumed] dB  43.34 [derived/assumed]   1.0000      28.78 [derived/assumed] m              no: 14.99 m
-B  ay L-CEF, monostatic             communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 10.90 m
-B  ay L-CEF, monostatic                     radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m              no: 10.90 m
-C  ay L-CEF, bistatic               communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.28 [derived/assumed] m              no: 13.40 m
-C  ay L-CEF, bistatic                       radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      12.76 [derived/assumed] m                      yes
-B  ay TRN field, monostatic         communication limit 22.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  43.75 [derived/assumed]   1.0000      29.41 [derived/assumed] m              no: 10.90 m
-B  ay TRN field, monostatic                 radar limit 20.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  41.75 [derived/assumed]   1.0000      26.35 [derived/assumed] m              no: 10.90 m
-C  ay TRN field, bistatic           communication limit 22.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  43.75 [derived/assumed]   1.0000      29.41 [derived/assumed] m              no: 13.40 m
-C  ay TRN field, bistatic                   radar limit 20.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  41.75 [derived/assumed]   1.0000      26.35 [derived/assumed] m              no: 13.40 m
+B  ay L-CEF, monostatic             communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.63 [derived/assumed] m              no: 10.90 m
+B  ay L-CEF, monostatic                     radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      13.07 [derived/assumed] m              no: 10.90 m
+C  ay L-CEF, bistatic               communication limit 22.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  30.74 [derived/assumed]   1.0000      14.63 [derived/assumed] m              no: 13.40 m
+C  ay L-CEF, bistatic                       radar limit 20.00 [derived/assumed] 48.16 [derived/assumed] dB = 1024 chips x 64 packets 1.76 [derived/assumed] dB  28.74 [derived/assumed]   1.0000      13.07 [derived/assumed] m                      yes
+B  ay TRN field, monostatic         communication limit 22.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  43.75 [derived/assumed]   1.0000      30.12 [derived/assumed] m              no: 10.90 m
+B  ay TRN field, monostatic                 radar limit 20.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  41.75 [derived/assumed]   1.0000      26.99 [derived/assumed] m              no: 10.90 m
+C  ay TRN field, bistatic           communication limit 22.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  43.75 [derived/assumed]   1.0000      30.12 [derived/assumed] m              no: 13.40 m
+C  ay TRN field, bistatic                   radar limit 20.00 [derived/assumed] 61.18 [derived/assumed] dB = 20480 chips x 64 packets 1.76 [derived/assumed] dB  41.75 [derived/assumed]   1.0000      26.99 [derived/assumed] m              no: 13.40 m
   SNR(cell): thermal noise only, at the peak (no straddle).  Row A's range is its report's detection.range_at_pd: 28.78 m by SNR, 14.99 m as the report concludes (limited by: if_band)
-  the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are 2.8 % longer (row B; 14.67 m)
+  one criterion, each row on its own map (CA-CFAR, guard 2, 8 training cells a side, 416 in all): row A needs 12.24 dB -- 0.49 dB over a known noise level: its windows and its x4 range padding leave 33.4 independent training cells of 416 (its report)
+      the ay rows need 11.81 [derived/assumed] dB -- 0.06 dB over: the Doppler window alone correlates the cells (221.0 of 416), the chip-spaced lags are independent; with the noise level known the range is 0.3 % longer (row B; 14.67 m)
+      second road, the CA-CFAR run on 200 maps of that shape: false alarms per cell 1.116e-04 +- 5.1e-06 (closed form 1.091e-04; 483 in 4329600 cells); Pd at 11.81 dB: 0.9003 +- 0.0037 (6400 targets)
   row A over row B, communication limit: +12.60 dB with 8 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x18.2 the chips, 0.68 ms a frame (2.0 % of the time, training alone)
   row A over row B, radar limit: +14.60 dB with 6 dB less EIRP: its frame is on the target for 6.4 ms, the ay frame's correlated chips for 37.2 us; equal SNR takes x28.8 the chips, 1.07 ms a frame (3.2 % of the time, training alone)
   row B on the TRN field against row A, communication limit: +0.41 dB with 8 dB more EIRP: 20480 chips a packet, 0.745 ms of correlated chips a frame
@@ -77,7 +79,11 @@ row                                                  ADC rate       channels    
 A  FMCW (fmcw_radar default)                10 [assumed] MS/s    1 (real IF)            12.00 [assumed]   as configured
 B  ay L-CEF, monostatic            3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
 C  ay L-CEF, bistatic              3520 [derived/assumed] MS/s    2 (I and Q)     9.09 [derived/assumed]   ENOB of mmw60_trx's converter model at this rate
-  A: its leakage budget is not in its default report (the model is off in that config; its example 08 turns it on); an FMCW radar's leakage beats to near zero frequency and is filtered ahead of the ADC
+  A: its leakage budget is not in its default report (the model is off in that config); fmcw_radar reports it for the same radar with the model on (configs/radar_60g_sensing_leakage.yaml; the nine inputs equal the default's):
+      conducted 4 dBm, isolation 20 [spec] dB, leakage -16 dBm at the receiver, path delay 0.2 ns [assumed]: it beats at 8 kHz
+      with its IF high-pass  meets the out of band compression point (margin +4.0 dB), ADC headroom +36.1 dB, SNR down 0.018 dB; isolation for 1 dB of SNR: 13.58 dB (+6.42 dB against the 20 dB) -- leakage allowed -9.58 dBm
+      without the high-pass  meets the in band compression point (margin -18.0 dB), ADC headroom -3.2 dB, SNR down 7.189 dB; isolation for 1 dB of SNR: 35.58 dB (-15.58 dB against the 20 dB) -- leakage allowed -31.58 dBm
+      beside row B (communication limit): isolation 43.24 dB at 12 dBm conducted -- leakage allowed -31.24 dBm.  Without its filter the FMCW receiver allows -0.34 dB against that; the filter is worth 22.0 dB, and the ay receiver has none to use: its leakage is the waveform itself, in the band of the echo
   B, communication limit (conducted 12 dBm): isolation needed for the leakage to cost at most 1 dB of sensitivity
       in-band compression    43.2 dB [derived/assumed]  (closed form; simulated 43.5 dB: the leakage at -31.2 dBm, +2.8 dB from the in-band P1dB; 46.0 dB puts it at P1dB itself)
       ADC quantisation       39.9 dB [derived/assumed]  (ENOB 9.09 at 3.52 GS/s, 12 dB under full scale)
@@ -196,6 +202,7 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   jcas60.lo_phase_noise            tgad_em.pn_params 的单极点单零点模型，每台设备一个本振  [assumed]
   jcas60.target                    {'range_m': 5.0, 'velocity_mps': 2.0}  [assumed]
   jcas60.detection                 {'pd': 0.9}  [assumed]
+  jcas60.cfar_monte_carlo          {'maps': 200, 'range_cells': 512, 'target_spacing_cells': 32, 'seed': 1}  [assumed]
   jcas60.bistatic_geometry         {'r_tx_m': 5.0, 'r_rx_m': 5.0, 'baseline_m': 5.0}  [assumed]
   jcas60.fmcw_airtime              FMCW 一帧的 chirp 串期间，这套前端不能通信  [assumed]
   jcas60.radar_reading_airtime     {'lower': '关断时间只管感知的发射：与按通信限值读时同一个占比', 'upper': '关断时间管这台设备的全部发射：任意 33 ms 里至少关断规定的时长'}  [assumed]
@@ -309,6 +316,10 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   jcas60.bistatic_geometry#baseline_m                                                 5 [assumed]
   jcas60.bistatic_geometry#r_rx_m                                                     5 [assumed]
   jcas60.bistatic_geometry#r_tx_m                                                     5 [assumed]
+  jcas60.cfar_monte_carlo#maps                                                      200 [assumed]
+  jcas60.cfar_monte_carlo#range_cells                                               512 [assumed]
+  jcas60.cfar_monte_carlo#seed                                                        1 [assumed]
+  jcas60.cfar_monte_carlo#target_spacing_cells                                       32 [assumed]
   jcas60.channel#number                                                               2 [assumed]
   jcas60.channel#width_hz                                                      2.16e+09 [assumed]
   jcas60.comm_limit_kind                                                                [assumed]
@@ -351,7 +362,7 @@ C  ay TRN field, bistatic                   radar limit        4.51 % ... 50 % [
   tgad_em.pn_params#f_pole_hz                                                     1e+06 [spec]
   tgad_em.pn_params#f_zero_hz                                                     1e+08 [spec]
   tgad_em.pn_params#psd0_dbchz                                                      -90 [spec]
-  row A: fmcw_radar@c303566 `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
+  row A: fmcw_radar@d1c48bd `python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>` (src/jcas60/data/upstream/fmcw_radar_budget.json)
 
 == 11. the ay sensing frame against spec_sources' 802.11bf entries, item by item (law 7; the entries are from the task groups' public documents) ==
   B     who transmits and who receives         fits                     here: one device transmits the packet and correlates its own echo

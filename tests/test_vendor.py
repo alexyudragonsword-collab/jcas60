@@ -10,12 +10,12 @@ import vendor_check as V
 
 REPO = Path(__file__).resolve().parent.parent
 PINS = {"spec_sources": "3a6e1905ef7c48c01338cf9cd808e3fd4bdad8a7", "mmw60_trx": "442fabd99c16b0e6cfc4432d35fe64dc053dc515",
-        "fmcw_radar": "c303566180c2ef22bd2bf6ffaa1f08e59174e110"}
+        "fmcw_radar": "d1c48bd972fabc693517a30d976ac85feda3739c"}
 
 
 def test_every_vendored_file_names_its_upstream_at_a_full_sha():
     files = V.vendored_files()
-    assert len(files) == 20
+    assert len(files) == 21
     for f in files:
         m = V.HEADER.match(f.read_text(encoding="utf-8").splitlines()[0])
         assert m, f
@@ -38,8 +38,7 @@ def test_vendor_check_strict_passes_against_the_siblings():
     results = V.check(sib, {})
     assert V.report(results, strict=True, fail_on_skip=True) == 0
     kinds = {r.rel: r.status for r in results}
-    assert sorted(k for k, v in kinds.items() if v == "adapted") == ["fmcw_radar/processing/rd.py"]
-    assert all(v in ("verbatim", "adapted") for v in kinds.values())
+    assert all(v == "verbatim" for v in kinds.values())                  # rd.py too, since fmcw_radar#44
 
 
 def test_only_what_is_read_is_vendored():
@@ -62,5 +61,5 @@ def test_only_what_is_read_is_vendored():
     assert not [n for n in names if "arraylink" in n or "array60" in n]
     used = (REPO / "src/jcas60").glob("*.py")
     text = "\n".join(p.read_text(encoding="utf-8") for p in used)
-    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble", "arraytx import beam", "arraytx import geometry"):
+    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble", "arraytx import beam", "arraytx import geometry", "processing import cfarstats"):
         assert mod in text, mod

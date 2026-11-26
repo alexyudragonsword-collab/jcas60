@@ -14,9 +14,9 @@
 - 以后做 OFDM 感知时要 `ay/training.py` 本身：它记在自己的 ROADMAP（里程碑 3“按需”），到时在 #89 或新 issue 里说，照 `preamble.py` 的分法拆。
 - L-STF 与 TRN 的组成它也没有公开出处（只有码片数）；有了、经 spec_sources 进来之后它再加，本库再 vendor。
 
-### fmcw_radar —— pin 在 `c303566`；#42 已验收；[fmcw_radar#44](https://github.com/alexyudragonsword-collab/fmcw_radar/issues/44) 待它答复
-- **A 行的泄漏**（#44 第 1 项）：默认配置的报告里 `leakage` 是 null，表的 §5 对 A 只写“没有建模”。请它给一份默认配置开着泄漏模型的报告；到了之后 A 行有隔离需求可比。
-- **B、C 的 CFAR 损失是借 A 行的**（#44 第 2 项）：三行的 Pd 0.9 距离都用报告的门限 12.24 dB（比噪声电平已知的 11.75 dB 高 0.49 dB，那是 A 行那张加 Hann 窗、4 倍补零的图上的数）。ay 的图不加距离窗、不补零，自己的损失应当更小；要算得 vendor 它的 `processing/cfarstats.py`，请它让那几个函数不带 `RadarConfig` 也拷得走。换成 11.75 dB 三行都远 2.7–2.8 %。
+### fmcw_radar —— pin 在 `d1c48bd`（0.2.34）；#42、#44 已验收
+- **A 行的泄漏只有 20 dB 隔离那一档**（示例 00 §5）：它的来源表里没有加隔离结构的 40 dB 那一条，报告按 20 dB 出（带高通余 6.42 dB）。B 行两档都有。要补得它先有那条来源（spec_sources 的 `isolation.*` 里有 40 dB，它读的是自己的表）；不急——带高通时 20 dB 已经够，结论不靠这一档。
+- 它的泄漏路径时延 0.2 ns 是占位（报告里标 assumed），本库的是 0.1 ns，也是假设（“没有做的”第 5 条）。两边谁有了出处，另一边跟。
 
 ## 里程碑 1：阵列与波束扫描下的感知
 

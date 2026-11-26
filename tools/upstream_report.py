@@ -32,11 +32,11 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 RECORD = REPO / "src" / "jcas60" / "data" / "upstream" / "fmcw_radar_budget.json"
-UPSTREAM = {"repo": "fmcw_radar", "sha": "c303566180c2ef22bd2bf6ffaa1f08e59174e110",
+UPSTREAM = {"repo": "fmcw_radar", "sha": "d1c48bd972fabc693517a30d976ac85feda3739c",
             "config": "configs/radar_60g_sensing.yaml",
             "command": "python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>"}
 #: other configs of the same pin, recorded beside the default's (the studies read them; row A never does)
-VARIANTS = {"x10lo": "configs/radar_60g_x10lo.yaml"}
+VARIANTS = {"x10lo": "configs/radar_60g_x10lo.yaml", "leakage": "configs/radar_60g_sensing_leakage.yaml"}
 ROOTS = ("/home/user", "/home/user/alexyudragonsword-collab")
 RTOL = 1e-9
 

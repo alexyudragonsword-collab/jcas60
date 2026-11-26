@@ -4,6 +4,13 @@
 
 ## 未发布
 
+### 重新 pin fmcw_radar@d1c48bd（0.2.34，fmcw_radar#44）：A 行的泄漏有数了；ay 各行用自己图上的 CFAR 门限（2026-11-26）
+- **对照表的数动了**：ay 各行 Pd 0.9 的距离远 2.4–2.5 %（L-CEF 14.28 → 14.63 m，TRN 29.41 → 30.12 m，雷达读法 26.35 → 26.99 m）。此前借的是 A 行图上的门限 12.24 dB；ay 自己的图上是 11.81 dB（`budget.cfar_snr_required`，用 vendored 的 `cfarstats`）。A 行不动。
+- 第二条路（`table.cfar_check`，`jcas60.cfar_monte_carlo`）：同形的噪声图上真跑 CA-CFAR，虚警率 1.116e-4 ± 0.05e-4 对闭式 1.091e-4，Pd 0.9003 ± 0.0037。
+- **A 行的泄漏**（§5，`table.a_leakage`）：读 fmcw_radar 对 `radar_60g_sensing_leakage.yaml` 的报告（`tools/upstream_report.py` 多录一份，CI 一并核）。带 IF 高通所需隔离 13.58 dB，不开 35.58 dB；容许的泄漏电平 −9.58 / −31.58 dBm，B 行 −31.24 dBm——不滤波时两种波形一样，高通值 22.0 dB。
+- vendor：21 个文件，全部 verbatim（`rd.py` 不再是 adapted，新拷 `cfarstats.py`）。只换 pin 的那次提交数字一个不动；用上的这次指纹新增 51 个值、动 12 个，共 2332 个。
+- 用 vendored 的函数在 A 行的图参数上复算出报告的 12.239994 dB（测试）。“每行同一个所需 SNR”的测试改成“每行同一条判据，各在自己的图上”。
+
 ### 里程碑 1 第一步：发射阵列（2026-11-26）
 - 新的示例 02（`jcas60.arrays`，约 45 s）与 `cairn/transmit-array.md`；对照表的数不动（只有表的文本哈希因假设清单多了 `jcas60.array` 而变）；指纹新增 446 个值，共 2281 个。
 - vendor arraytx 的 `geometry.py` / `beam.py`（经 mmw60_trx 的 pin；20 个文件，19 verbatim、1 adapted）。mmw60_trx 自己的阵列链路与 `Frontend60` 不拷。

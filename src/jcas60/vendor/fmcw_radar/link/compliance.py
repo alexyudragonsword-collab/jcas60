@@ -1,4 +1,4 @@
-# Vendored from fmcw_radar@c303566180c2ef22bd2bf6ffaa1f08e59174e110: src/fmcw_radar/link/compliance.py
+# Vendored from fmcw_radar@d1c48bd972fabc693517a30d976ac85feda3739c: src/fmcw_radar/link/compliance.py
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 """Regulatory check of the transmitter: 47 CFR 15.255(c)(2), the radar limits
 of the 57-71 GHz band.
