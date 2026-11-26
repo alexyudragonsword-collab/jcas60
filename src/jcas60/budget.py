@@ -30,6 +30,7 @@ from .config import Setup
 from .physconst import C0, db, undb
 from .sources import Num, derive
 from .vendor.fmcw_radar.link.compression import small_signal
+from .vendor.fmcw_radar.processing import cfarstats as _cfarstats
 from .vendor.fmcw_radar.processing.detection import pd_swerling0, snr_for_pd
 from .vendor.fmcw_radar.processing.windows import enbw_bins, window
 
@@ -213,9 +214,24 @@ def link(s: Setup, kind: str, eirp: Num, range_m: float | None = None, field=Non
 # ----------------------------------------------------------------------------- detection
 def snr_required_db(pd: float, pfa: float) -> float:
     """The cell SNR a steady target needs for ``pd`` at ``pfa`` with the noise level known (fmcw_radar's
-    ``snr_for_pd``).  The table's criterion is the one fmcw_radar's report uses instead -- what its map's CA-CFAR
-    needs, 0.49 dB more -- and this figure is printed beside it."""
+    ``snr_for_pd``).  The table's criterion is what each row's own map's CA-CFAR needs instead (row A: its report's
+    figure, 0.49 dB more; the ay rows: ``cfar_snr_required``, 0.06 dB more) and this figure is printed beside them."""
     return snr_for_pd(pd, pfa)
+
+
+def cfar_statistics(s: Setup, pfa: float) -> dict:
+    """What the ay rows' own range-Doppler map does to its CA-CFAR (fmcw_radar's ``cfar_statistics_2d``): the Doppler
+    window along the packets, not padded; along range the chip-spaced lags the detector runs on, which the Nyquist
+    pulse leaves independent of one another -- no window, no padding.  Guard and training cells are ``jcas60.sim``'s."""
+    return _cfarstats.cfar_statistics_2d(_window(s), 1, np.ones(s.field.zero_sidelobe_chips), 1,
+                                         int(s.sim["cfar_guard"]), int(s.sim["cfar_train"]), pfa)
+
+
+def cfar_snr_required(s: Setup, pfa: Num) -> Num:
+    """The cell SNR a steady target needs for the table's Pd under that CA-CFAR (the threshold's own fluctuation and
+    the target's leak into its training cells included): the ay rows' criterion, as the report's figure is row A's."""
+    need = _cfarstats.cfar_snr_for_pd(s.pd.value, cfar_statistics(s, pfa.value))
+    return derive(need, "the cell SNR this map's CA-CFAR needs for Pd at Pfa (fmcw_radar's cfarstats on the ay map)", s.pd, pfa, s.n_packets, unit="dB")
 
 
 def pd_at(snr_db: float, pfa: float) -> float:
@@ -233,7 +249,7 @@ def range_for_snr(snr_of_range, snr_req_db: float, lo: float = 0.5, hi: float = 
 
 
 def detection_range_m(s: Setup, kind: str, eirp: Num, snr_req_db: Num, field=None) -> Num:
-    """The range at which the cell SNR falls to ``snr_req_db`` (the table hands every row the same one)."""
+    """The range at which the cell SNR falls to ``snr_req_db`` (each row's own map's criterion)."""
     r = range_for_snr(lambda x: link(s, kind, eirp, x, field).snr_cell_db.value, snr_req_db.value)
     return derive(r, "SNR(cell)(R) = the required SNR", eirp, snr_req_db, s.pd, s.fe.nf_db, s.fe.rx_gain_dbi, s.rcs_dbsm, s.n_packets, unit="m")
 

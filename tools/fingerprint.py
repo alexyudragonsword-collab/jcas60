@@ -94,6 +94,8 @@ def record() -> dict:
     _flat("table.pulse_sidelobes", t["pulse_sidelobes"], out)
     _flat("table.width_measured_chips", t["width_measured_chips"], out)
     _flat("table.sensitivity", t["sensitivity"], out)
+    _flat("table.cfar", t["cfar"], out)                          # the ay map's criterion and its Monte Carlo
+    _flat("table.a_leakage", t["a_leakage"], out)                # row A's leakage, as its report has it
     _flat("table.text", hashlib.sha256(table.render(t).encode()).hexdigest(), out)
     # the pieces under the table, on their own
     _flat("field.chips", np.asarray(s.field.chips), out)

@@ -56,17 +56,77 @@ def test_row_a_cells_not_in_the_report_are_derived_from_it_and_say_so(t):
     assert a["range_limited_by"] == "if_band" and a["range_actual_m"].value == a["range_max_m"].value
 
 
-def test_every_row_is_held_to_the_same_required_snr(t):
-    """One criterion for the three ways: the report's CA-CFAR figure; each ay row's range is where its closed-form
-    cell SNR falls to it."""
+def test_every_row_is_held_to_one_criterion_on_its_own_map(t):
+    """One criterion for the three ways -- Pd at Pfa under the CA-CFAR of the row's own map: row A's is its report's
+    figure, the ay rows' is fmcw_radar's cfarstats on the ay map; each ay row's range is where its closed-form cell
+    SNR falls to it."""
     req = t["rows"][0]["snr_required_db"]
     assert req.value == t["snr_required_db"] == pytest.approx(12.24, abs=0.005)
-    assert t["snr_required_db"] - t["snr_required_known_noise_db"] == pytest.approx(0.49, abs=0.005)
+    assert t["snr_required_db"] - t["snr_required_known_noise_db"] == pytest.approx(0.49, abs=0.005) == pytest.approx(t["rows"][0]["cfar_loss_db"].value, abs=0.005)
     s = t["setup"]
+    need = budget.cfar_snr_required(s, t["rows"][0]["pfa"])
+    assert need.value == t["snr_required_ay_db"] == pytest.approx(11.806, abs=5e-4) and need.tag == "derived"
+    assert t["snr_required_known_noise_db"] < need.value < req.value                   # the ay map costs its CFAR less than row A's does
     for r in t["rows"][1:]:
+        assert r["snr_required_db"].value == need.value
         field = s.trn_field if r["field"] == "TRN field" else s.field
         at = budget.link(s, r["kind"], r["eirp_dbm"], r["range_pd_m"].value, field).snr_cell_db.value
-        assert at == pytest.approx(req.value, abs=1e-6), (r["name"], r["limit"])
+        assert at == pytest.approx(need.value, abs=1e-6), (r["name"], r["limit"])
+
+
+def test_row_as_cfar_figure_recomputed_with_the_vendored_functions():
+    """fmcw_radar#44's acceptance: its report's 12.24 dB comes out of the vendored cfarstats on row A's map -- Hann on
+    both axes, the range axis padded as the report says, the guard and training cells the report implies."""
+    import numpy as np
+
+    from jcas60.vendor.fmcw_radar.processing import cfarstats as CS
+    from jcas60.vendor.fmcw_radar.processing.windows import range_window, window
+    g = A.get
+    pad = int(g("cfar.range_pad"))
+    guard = int(round(g("cfar.guard_bins_range") * pad))
+    train = int(g("cfar.window_half_range")) - guard
+    n = int(round(g("radar.adc_fs_msps") * g("radar.chirp_us")))
+    st = CS.cfar_statistics_2d(window("hann", int(g("radar.n_chirps"))), 1, range_window(g("radar.range_window"), n, 0), pad, guard, train, g("detection.pfa"))
+    assert (pad, guard, train, n) == (4, 2, 8, 1000)
+    assert CS.cfar_snr_for_pd(g("detection.range_at_pd.pd"), st) == pytest.approx(g("cfar.snr_pd90_db"), abs=1e-9) == pytest.approx(12.239994, abs=1e-6)
+    assert st["n_train_eff"] == pytest.approx(g("cfar.n_train_eff"), rel=1e-9) and st["pfa_cell"] == pytest.approx(g("cfar.pfa_cell"), rel=1e-9)
+    # no windows at all (the reply's second figure): 0.048 dB over the known-noise 11.749 dB
+    plain = CS.cfar_statistics_2d(np.ones(64), 1, np.ones(512), 1, guard, train, g("detection.pfa"))
+    assert CS.cfar_snr_for_pd(0.9, plain) == pytest.approx(11.797, abs=5e-4)
+
+
+def test_law4_the_ay_maps_cfar_on_two_roads(t):
+    """The closed form (fmcw_radar's exact Hermitian form) against the CA-CFAR run on maps of the ay map's shape:
+    the false-alarm rate and the detection probability at the required SNR, each within three standard errors."""
+    c = t["cfar"]
+    assert c["n_train"] == 416 and c["n_train_eff"] == pytest.approx(221.05, abs=0.01) and c["loss_db"] == pytest.approx(0.0565, abs=5e-4)
+    assert abs(c["pfa_cell_sim"] - c["pfa_cell_closed"]) < 3.0 * c["pfa_cell_sim_sigma"] and c["pfa_cell_sim_sigma"] < 0.06 * c["pfa_cell_closed"]
+    assert abs(c["pd_sim"] - t["setup"].pd.value) < 3.0 * c["pd_sim_sigma"] and c["pd_sim_sigma"] < 0.005
+    assert c["pfa_cell_closed"] == pytest.approx(1.0914e-4, rel=1e-3)                  # 9 % over the design: correlated training cells
+
+
+def test_row_as_leakage_is_the_leakage_reports_item_by_item(t):
+    """Row A's leakage block is read, not computed: every number equals fmcw_radar's report of its default radar with
+    the leakage model on, whose inputs equal the default report's (fmcw_radar#44)."""
+    rep, base = A.variant("leakage")["report"], A.report()
+    al, k = t["a_leakage"], rep["leakage"]
+    assert al["inputs_equal_default"] and rep["inputs"] == base["inputs"] and base["leakage"] is None
+    for section in ("radar", "inputs", "target", "chirp", "nonlinearity", "angle"):
+        assert rep[section] == base[section], section
+    assert A.variant("leakage")["_provenance"]["sha"] == A.provenance()["sha"]
+    assert (al["level_rx_dbm"].value, al["isolation_db"].value, al["isolation_db"].tag, al["path_delay_s"].tag) == (k["level_rx_dbm"], k["isolation_db"], "spec", "assumed")
+    assert al["conducted_dbm"].value == rep["compliance"]["conducted_dbm"] == base["compliance"]["conducted_dbm"]
+    for c, src in zip(al["cases"], (k, k["without_hpf"])):
+        assert (c["need_db"].value, c["spare_db"].value, c["snr_loss_db"].value, c["p1db_kind"]) == \
+            (src["isolation_needed_db"], src["isolation_spare_db"], src["snr_loss_db"], src["p1db_kind"])
+        assert c["leak_allowed_dbm"].value == al["conducted_dbm"].value - c["need_db"].value and c["leak_allowed_dbm"].tag == "derived"
+    hpf, bare = al["cases"]
+    assert (hpf["p1db_kind"], bare["p1db_kind"]) == ("out of band", "in band")
+    assert hpf["need_db"].value == pytest.approx(13.58, abs=0.006) and bare["need_db"].value == pytest.approx(35.58, abs=0.006)
+    # the same front end without a filter allows the same leakage whichever waveform: within half a dB of row B's
+    b = t["monostatic"][0]["cost"]
+    assert abs(bare["leak_allowed_dbm"].value - (b.conducted_dbm.value - b.need_db.value)) < 0.5
+    assert hpf["leak_allowed_dbm"].value - bare["leak_allowed_dbm"].value == pytest.approx(22.0, abs=0.05)
 
 
 def test_the_recorded_report_is_what_the_pinned_fmcw_radar_writes():
@@ -89,7 +149,7 @@ def test_the_numbers_the_conclusions_quote(t):
            "B trn snr": rows[5]["snr_db"].value, "B trn radar snr": rows[6]["snr_db"].value, "air trn": rows[5]["air_fraction"].value * 100,
            "comp 40": t["monostatic"][0]["checks"][1]["comp_snr_closed_db"], "image 40": t["monostatic"][0]["checks"][1]["comp_image_sim_dbc"], "need adc": t["monostatic"][0]["cost"].need_adc_db.value,
            "need pn": t["monostatic"][0]["cost"].need_pn_db.value, "air": rows[1]["air_fraction"].value * 100, "air A": rows[0]["air_fraction"].value * 100}
-    want = {"A snr": 43.34, "B comm snr": 30.74, "B radar snr": 28.74, "B comm range": 14.28, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
+    want = {"A snr": 43.34, "B comm snr": 30.74, "B radar snr": 28.74, "B comm range": 14.63, "A range": 28.78, "B res cm": 8.52, "A res cm": 3.75,
             "B width cm": 7.43, "B clean": 10.90, "need": 43.2, "ghost": 48.7, "B trn snr": 43.75, "B trn radar snr": 41.75, "air trn": 4.51, "comp 40": -2.17, "image 40": -11.8, "need adc": 39.9, "need pn": 43.0, "air": 1.16, "air A": 19.20}
     for k, v in want.items():
         assert got[k] == pytest.approx(v, abs=0.006 if (abs(v) < 20 and k not in ("ghost", "image 40")) or "snr" in k or "range" in k else 0.06), k

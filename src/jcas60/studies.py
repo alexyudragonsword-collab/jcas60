@@ -528,7 +528,7 @@ def designed_waveform(s, bench) -> dict:
                   "psd_average_hz": width, "psd_excess_max_db": float(ratio.max()), "psd_excess_min_db": float(ratio.min()),
                   "psd_total_db": db(float(np.sum(np.abs(new.chips) ** 2) / np.sum(np.abs(std.chips) ** 2)))}
     sim = W.Simulator(s, new)
-    req = A.rep("detection.range_at_pd.snr_required_db", unit="dB")
+    req = B.cfar_snr_required(s, A.rep("detection.pfa", "assumed"))
     rows = []
     for name, field, fsim in (("standard TRN subfield, blocks 2-5", std, bench.sim_trn), ("designed, every block", new, sim)):
         link = B.link(s, "monostatic", eirp, field=field)

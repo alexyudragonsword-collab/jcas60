@@ -28,7 +28,9 @@ from . import wavesim as W
 from .config import Setup, setup
 from .physconst import db
 from .sources import Num, derive
+from .vendor.fmcw_radar.processing import cfar as _cfar
 from .vendor.fmcw_radar.processing import rd as _rd
+from .vendor.fmcw_radar.processing.windows import window as _window
 
 N = Num
 
@@ -70,7 +72,8 @@ def row_a() -> dict:
         "off_time_have_s": A.rep("compliance.tiers.5.off_time_have_s", unit="s") if A.get("compliance.tiers.5.tier") == g["tier"] else None,
         "adc_fs_hz": N(fs.value * 1e6, "assumed", "fmcw_radar report: radar.adc_fs_msps", "Hz"), "adc_channels": "1 (real IF)",
         "adc_bits": A.rep("radar.adc_bits", "assumed", "bit"), "adc_bits_what": "as configured",
-        "leakage": A.get("leakage"),
+        "leakage": A.get("leakage"), "cfar_loss_db": A.rep("cfar.cfar_loss_db", unit="dB"), "cfar_n_train": int(A.get("cfar.n_train")),
+        "cfar_n_train_eff": A.rep("cfar.n_train_eff"), "cfar_range_pad": int(A.get("cfar.range_pad")),
         "air_fraction": frac, "air_fraction_upper": None, "rate_mbps": rate,
         "loss_mbps": derive(frac.value * rate.value, "fraction x rate", frac, rate, unit="Mb/s"), "loss_upper_mbps": None,
     }
@@ -147,6 +150,7 @@ def row_ay(s: Setup, bench: _Bench, kind: str, reading: R.Reading, pfa: Num, snr
     sim_snr = derive(meas["snr_db"], f"waveform simulation, mean of {bench.frames} frames: peak / floor of the range-Doppler map", eirp, s.n_packets, unit="dB")
     row = {
         "name": f"{'B' if kind == 'monostatic' else 'C'}  ay {'TRN field' if on_trn else 'L-CEF'}, {kind}", "limit": reading.name, "kind": kind,
+        "snr_required_db": snr_req,
         "field": "TRN field" if on_trn else "L-CEF", "packet_s": s.packet_seconds(field),
         "bandwidth_hz": s.chip_rate_hz,
         "range_res_m": derive(s.chip_m / g.cos_half_beta, "c / (2 Rc cos(beta/2))", s.chip_rate_hz, s.bi_baseline_m if kind == "bistatic" else s.chip_rate_hz, unit="m"),
@@ -284,6 +288,65 @@ def bistatic_block(s: Setup, bench: _Bench, reading: R.Reading) -> dict:
             "pn_rise_sim_db": pn["floor_dbm"] - lin["floor_dbm"], "pn_snr_change_db": pn["snr_db"] - lin["snr_db"]}
 
 
+def a_leakage() -> dict:
+    """Row A's leakage, as fmcw_radar reports it for its default radar with the leakage model on and the IF high-pass
+    an FMCW radar meets it with (``radar_60g_sensing_leakage.yaml``, fmcw_radar#44: three config fields differ from the
+    default's, the nine inputs do not), and the same without the filter.  Nothing is recomputed; tags are the report's."""
+    rep = A.variant("leakage")
+    k = rep["report"]["leakage"]
+    where = f"fmcw_radar report ({rep['_provenance']['config']}): leakage."
+
+    def num(path, unit, tag="derived"):
+        v = k
+        for part in path.split("."):
+            v = v[part]
+        return Num(float(v), tag, where + path, unit, "assumed" if tag == "derived" else "")
+    cond = Num(float(rep["report"]["compliance"]["conducted_dbm"]), "derived", "fmcw_radar report: compliance.conducted_dbm", "dBm", "assumed")
+    out = {"config": rep["_provenance"]["config"], "inputs_equal_default": rep["report"]["inputs"] == A.report()["inputs"],
+           "conducted_dbm": cond, "isolation_db": num("isolation_db", "dB", k["isolation_source"]),
+           "path_delay_s": num("path_delay_s", "s", k["path_delay_source"]), "beat_hz": num("beat_hz", "Hz"),
+           "level_rx_dbm": num("level_rx_dbm", "dBm"), "criterion_db": num("snr_loss_criterion_db", "dB", "assumed"), "cases": []}
+    for name, pre in (("with its IF high-pass", ""), ("without the high-pass", "without_hpf.")):
+        need = num(pre + "isolation_needed_db", "dB")
+        out["cases"].append({"name": name, "p1db_kind": (k if not pre else k["without_hpf"])["p1db_kind"], "p1db_margin_db": num(pre + "p1db_margin_db", "dB"),
+                             "adc_headroom_db": num(pre + "adc_headroom_db", "dB"), "snr_loss_db": num(pre + "snr_loss_db", "dB"),
+                             "need_db": need, "spare_db": num(pre + "isolation_spare_db", "dB"),
+                             "leak_allowed_dbm": derive(cond.value - need.value, "conducted power - isolation needed", cond, need, unit="dBm")})
+    return out
+
+
+def cfar_check(s: Setup, pfa: Num, need: Num) -> dict:
+    """The ay rows' detection criterion on its second road: the CA-CFAR itself (fmcw_radar's ``ca_cfar_2d``) run on
+    maps of the ay map's shape -- white noise through the Doppler window, chip-spaced lags independent -- for the
+    false-alarm rate, and on the same noise with steady targets at the required SNR for the detection probability."""
+    key = "jcas60.cfar_monte_carlo"
+    maps, nr, step = (int(S.num(f"{key}#{k}").value) for k in ("maps", "range_cells", "target_spacing_cells"))
+    guard, train = int(s.sim["cfar_guard"]), int(s.sim["cfar_train"])
+    wd, m, h = _window(s.doppler_window, int(s.n_packets.value)), int(s.n_packets.value), guard + train
+    st = B.cfar_statistics(s, pfa.value)
+    amp = math.sqrt(10.0 ** (need.value / 10.0) * float(np.sum(wd ** 2)) * nr) / (float(np.sum(wd)) * nr)
+    kd, kr = np.arange(step // 2, m - h, step), np.arange(step // 2, nr - h, step)
+    tone = amp * np.exp(2j * np.pi * kd[:, None, None, None] * np.arange(m)[None, None, :, None] / m) \
+        * np.exp(2j * np.pi * kr[None, :, None, None] * np.arange(nr)[None, None, None, :] / nr)
+    tone = tone.sum(axis=(0, 1))
+    rng = np.random.default_rng(int(S.num(f"{key}#seed").value))
+    false = cells = hits = trials = 0
+
+    def detect(x):
+        y = np.fft.fft(np.fft.fft(x, axis=1) * wd[:, None], axis=0)
+        return _cfar.ca_cfar_2d(np.abs(y) ** 2, guard, train, pfa.value)[1]
+    for _ in range(maps):
+        x = (rng.standard_normal((m, nr)) + 1j * rng.standard_normal((m, nr))) / math.sqrt(2.0)
+        inner = detect(x)[h:-h, h:-h]                              # away from the edges, where the windows are whole
+        false, cells = false + int(inner.sum()), cells + inner.size
+        got = detect(x + tone)[np.ix_(kd, kr)]
+        hits, trials = hits + int(got.sum()), trials + got.size
+    pd = hits / trials
+    return {"need_db": need, "loss_db": need.value - B.snr_required_db(s.pd.value, pfa.value), "n_train": st["n_train"], "n_train_eff": st["n_train_eff"],
+            "pfa_cell_closed": st["pfa_cell"], "pfa_cell_sim": false / cells, "pfa_cell_sim_sigma": math.sqrt(false) / cells, "false_alarms": false, "cells": cells,
+            "pd_sim": pd, "pd_sim_sigma": math.sqrt(pd * (1.0 - pd) / trials), "trials": trials, "maps": maps, "guard": guard, "train": train}
+
+
 def golay_under_doppler(s: Setup, bench: _Bench, velocities, sim=None, span_chips: int | None = None) -> list:
     """Peak sidelobe of the summed correlations at the chip-spaced lags of the zero-sidelobe zone, one packet, no
     noise, the target on a chip: what the pair's complementarity is worth when the target moves.  The last column
@@ -385,8 +448,9 @@ def build() -> dict:
     a = row_a()
     comm, radar = R.readings(s)
     comm_t, radar_t = R.readings(s, s.trn_field)                 # the same limits; the burst is longer by the TRN field
-    rows = [a] + [row_ay(s, bench, kind, rd_, a["pfa"], a["snr_required_db"]) for kind in ("monostatic", "bistatic") for rd_ in (comm, radar)]
-    rows += [row_ay(s, bench, kind, rd_, a["pfa"], a["snr_required_db"], s.trn_field) for kind in ("monostatic", "bistatic") for rd_ in (comm_t, radar_t)]
+    need = B.cfar_snr_required(s, a["pfa"])                       # the ay rows' own map's criterion; row A's is its report's
+    rows = [a] + [row_ay(s, bench, kind, rd_, a["pfa"], need) for kind in ("monostatic", "bistatic") for rd_ in (comm, radar)]
+    rows += [row_ay(s, bench, kind, rd_, a["pfa"], need, s.trn_field) for kind in ("monostatic", "bistatic") for rd_ in (comm_t, radar_t)]
     v_max = rows[1]["velocity_max_mps"].value
     return {
         "setup": s, "rows": rows, "readings": (comm, radar),
@@ -401,7 +465,8 @@ def build() -> dict:
         "pulse_sidelobes": pulse_sidelobes(s, bench), "width_measured_chips": measured_width_chips(s, bench),
         "sensitivity": sensitivity(s, comm, a["pfa"].value),
         "bf": bf.checks(s),
-        "snr_required_db": a["snr_required_db"].value,
+        "snr_required_db": a["snr_required_db"].value, "snr_required_ay_db": need.value,
+        "cfar": cfar_check(s, a["pfa"], need), "a_leakage": a_leakage(),
         "snr_required_known_noise_db": B.snr_required_db(s.pd.value, a["pfa"].value),
         "range_known_noise_m": B.detection_range_m(s, "monostatic", comm.eirp_dbm, derive(B.snr_required_db(s.pd.value, a["pfa"].value),
                                                    "SNR for Pd at Pfa, noise level known", s.pd, a["pfa"], unit="dB")).value,
@@ -429,8 +494,8 @@ def render(t: dict | None = None) -> str:
     w(ENGINE_BANNER)
     w(f"jcas60 {__version__}; milestone 0: {WORDING}")
     w(f"one target for every row: a person at {s.range_m.show('g')} m receding at {s.velocity_mps.show('g')} m/s, RCS {s.rcs_dbsm.show('g')} dBsm; "
-      f"detection: Pd {s.pd.show('g')} at Pfa {a['pfa'].show('g')}, Swerling 0, at the cell SNR fmcw_radar's report says its map's CA-CFAR needs, "
-      f"{a['snr_required_db'].show('.2f')} dB, for every row (with the noise level known: {t['snr_required_known_noise_db']:.2f} dB)")
+      f"detection: Pd {s.pd.show('g')} at Pfa {a['pfa'].show('g')}, Swerling 0, at the cell SNR each row's own map's CA-CFAR needs: "
+      f"row A {a['snr_required_db'].show('.2f')} dB (its report), the ay rows {rows[1]['snr_required_db'].show('.2f')} dB (with the noise level known: {t['snr_required_known_noise_db']:.2f} dB)")
     w("tags: [spec] the source's own text, [survey] not verified, [assumed] this library's or a sibling's choice, [derived] computed from "
       "spec numbers, [derived/assumed] computed from at least one assumed number")
     w("")
@@ -475,8 +540,13 @@ def render(t: dict | None = None) -> str:
           f"{'yes' if inside else 'no: ' + format(r['range_max_m'].value, '.2f') + ' m':>24s}")
     w(f"  SNR(cell): thermal noise only, at the peak (no straddle).  Row A's range is its report's detection.range_at_pd: {a['range_pd_m'].value:.2f} m by SNR, "
       f"{a['range_actual_m'].value:.2f} m as the report concludes (limited by: {a['range_limited_by']})")
-    w(f"  the ay rows are held to the same required SNR; what a CA-CFAR on their own map would need is not computed (jcas60.detection): with the noise level known the ranges are "
-      f"{(t['range_known_noise_m'] / rows[1]['range_pd_m'].value - 1.0) * 100:.1f} % longer (row B; {t['range_known_noise_m']:.2f} m)")
+    cf = t["cfar"]
+    w(f"  one criterion, each row on its own map (CA-CFAR, guard {cf['guard']}, {cf['train']} training cells a side, {cf['n_train']} in all): row A needs {a['snr_required_db'].value:.2f} dB -- "
+      f"{a['cfar_loss_db'].value:.2f} dB over a known noise level: its windows and its x{a['cfar_range_pad']} range padding leave {a['cfar_n_train_eff'].value:.1f} independent training cells of {a['cfar_n_train']} (its report)")
+    w(f"      the ay rows need {cf['need_db'].show('.2f')} dB -- {cf['loss_db']:.2f} dB over: the Doppler window alone correlates the cells ({cf['n_train_eff']:.1f} of {cf['n_train']}), "
+      f"the chip-spaced lags are independent; with the noise level known the range is {(t['range_known_noise_m'] / rows[1]['range_pd_m'].value - 1.0) * 100:.1f} % longer (row B; {t['range_known_noise_m']:.2f} m)")
+    w(f"      second road, the CA-CFAR run on {cf['maps']} maps of that shape: false alarms per cell {cf['pfa_cell_sim']:.3e} +- {cf['pfa_cell_sim_sigma']:.1e} (closed form {cf['pfa_cell_closed']:.3e}; "
+      f"{cf['false_alarms']} in {cf['cells']} cells); Pd at {cf['need_db'].value:.2f} dB: {cf['pd_sim']:.4f} +- {cf['pd_sim_sigma']:.4f} ({cf['trials']} targets)")
     for r in (rows[1], rows[2]):
         gap = a["snr_db"].value - r["snr_db"].value
         chips = 10.0 ** (gap / 10.0) * s.field.n_correlated * s.n_packets.value
@@ -518,8 +588,18 @@ def render(t: dict | None = None) -> str:
     w(f"{'row':34s} {'ADC rate':>26s} {'channels':>14s} {'bits':>26s}   what the bits are")
     for r in (rows[0], rows[1], rows[3]):
         w(f"{r['name']:34s} {_n(r['adc_fs_hz'], 'g', 1e-6) + ' MS/s':>26s} {r['adc_channels']:>14s} {_n(r['adc_bits'], '.2f'):>26s}   {r['adc_bits_what']}")
-    w(f"  A: its leakage budget is {'not in its default report (the model is off in that config; its example 08 turns it on)' if a['leakage'] is None else 'in its report'}; "
-      "an FMCW radar's leakage beats to near zero frequency and is filtered ahead of the ADC")
+    al = t["a_leakage"]
+    w(f"  A: its leakage budget is {'not in its default report (the model is off in that config)' if a['leakage'] is None else 'in its report'}; fmcw_radar reports it for the same radar with the model on "
+      f"({al['config']}; the nine inputs {'equal' if al['inputs_equal_default'] else 'DO NOT equal'} the default's):")
+    w(f"      conducted {al['conducted_dbm'].value:g} dBm, isolation {al['isolation_db'].show('g')} dB, leakage {al['level_rx_dbm'].value:g} dBm at the receiver, "
+      f"path delay {al['path_delay_s'].value * 1e9:g} ns {al['path_delay_s'].label}: it beats at {al['beat_hz'].value / 1e3:g} kHz")
+    for c in al["cases"]:
+        w(f"      {c['name']:22s} meets the {c['p1db_kind']} compression point (margin {c['p1db_margin_db'].value:+.1f} dB), ADC headroom {c['adc_headroom_db'].value:+.1f} dB, SNR down {c['snr_loss_db'].value:.3f} dB; "
+          f"isolation for {al['criterion_db'].value:g} dB of SNR: {c['need_db'].value:.2f} dB ({c['spare_db'].value:+.2f} dB against the {al['isolation_db'].value:g} dB) -- leakage allowed {c['leak_allowed_dbm'].value:.2f} dBm")
+    b0 = t["monostatic"][0]["cost"]
+    w(f"      beside row B ({t['monostatic'][0]['reading']}): isolation {b0.need_db.value:.2f} dB at {b0.conducted_dbm.value:g} dBm conducted -- leakage allowed {b0.conducted_dbm.value - b0.need_db.value:.2f} dBm.  "
+      f"Without its filter the FMCW receiver allows {al['cases'][1]['leak_allowed_dbm'].value - (b0.conducted_dbm.value - b0.need_db.value):+.2f} dB against that; "
+      f"the filter is worth {al['cases'][0]['leak_allowed_dbm'].value - al['cases'][1]['leak_allowed_dbm'].value:.1f} dB, and the ay receiver has none to use: its leakage is the waveform itself, in the band of the echo")
     for blk in t["monostatic"]:
         c = blk["cost"]
         w(f"  B, {blk['reading']} (conducted {c.conducted_dbm.value:g} dBm): isolation needed for the leakage to cost at most {s.desense_allowed_db.value:g} dB of sensitivity")

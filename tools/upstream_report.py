@@ -36,7 +36,7 @@ UPSTREAM = {"repo": "fmcw_radar", "sha": "d1c48bd972fabc693517a30d976ac85feda373
             "config": "configs/radar_60g_sensing.yaml",
             "command": "python tools/budget_report.py configs/radar_60g_sensing.yaml --json <out>"}
 #: other configs of the same pin, recorded beside the default's (the studies read them; row A never does)
-VARIANTS = {"x10lo": "configs/radar_60g_x10lo.yaml"}
+VARIANTS = {"x10lo": "configs/radar_60g_x10lo.yaml", "leakage": "configs/radar_60g_sensing_leakage.yaml"}
 ROOTS = ("/home/user", "/home/user/alexyudragonsword-collab")
 RTOL = 1e-9
 

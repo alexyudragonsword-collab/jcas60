@@ -114,8 +114,15 @@ entries:
     value: {pd: 0.9}
     unit: "-"
     source: assumed
-    cite: "本库；虚警概率与要求的 SNR 取 fmcw_radar 报告的 detection.pfa 与 detection.range_at_pd.snr_required_db"
-    note: "“能探测到的最远距离”按检测概率 0.9 算，三行同一条判据：fmcw_radar 的报告给的、它那张图上 CA-CFAR 在这个 Pd 下要的格点 SNR（12.24 dB，含门限自身的起伏与目标漏进训练格）。A 行直接读报告的距离；B、C 用同一个门限，它们自己那张图（不加距离窗、不补零）上 CFAR 的损失没有算，借的是 A 行的 0.49 dB。换了会动什么：换成噪声电平已知的门限（11.75 dB）三行的距离都远 2.7–2.8 %；Pd 取 0.5 时已知噪声电平的门限再低 2.35 dB（9.40 dB）。"
+    cite: "本库；虚警概率取 fmcw_radar 报告的 detection.pfa；所需的格点 SNR：A 行取报告的 detection.range_at_pd.snr_required_db，ay 各行用 vendored 的 cfarstats 在自己的图上算"
+    note: "“能探测到的最远距离”按检测概率 0.9 算，三行同一条判据：各自那张图上 CA-CFAR（保护 2 格、训练 8 格，jcas60.sim）在这个 Pd 下要的格点 SNR，含门限自身的起伏与目标漏进训练格。A 行直接读报告（12.24 dB，比噪声电平已知的 11.75 dB 高 0.49 dB：Hann 窗加 4 倍补零让训练格只剩 33 个独立的）；ay 各行 11.81 dB（高 0.06 dB：只有多普勒窗让相邻格相关，码片间隔的时延格彼此独立）。2026-11-26 之前 ay 各行借的是 A 行的 12.24 dB。换了会动什么：换成噪声电平已知的门限（11.75 dB）ay 各行的距离远 0.3 %、A 行远 2.8 %；Pd 取 0.5 时已知噪声电平的门限再低 2.35 dB（9.40 dB）；保护格、训练格数换了两边的损失都变。"
+
+  jcas60.cfar_monte_carlo:
+    value: {maps: 200, range_cells: 512, target_spacing_cells: 32, seed: 1}
+    unit: "张, 格, 格, -"
+    source: assumed
+    cite: "本库"
+    note: "ay 各行检测判据的第二条路（jcas60.table.cfar_check）：在与 ay 的图同形的噪声图上真跑 CA-CFAR，数虚警；在同一份噪声上按所需 SNR 放稳定目标，数检出。图取 64 × range_cells 格，目标每隔 target_spacing_cells 格放一个（大于训练窗，互不进对方的训练格）。换了会动什么：只动统计误差（maps = 200 时虚警率 ±5 %、Pd ±0.004），不动表里任何一行的数。"
 
   jcas60.bistatic_geometry:
     value: {r_tx_m: 5.0, r_rx_m: 5.0, baseline_m: 5.0}

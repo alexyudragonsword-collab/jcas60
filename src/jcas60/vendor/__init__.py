@@ -75,7 +75,10 @@ Pins
 
   fmcw_radar's budget report of its default config is not a file of its
   repository; it is regenerated from the pinned commit by
-  ``tools/upstream_report.py`` and kept in ``jcas60/data/upstream/``.
+  ``tools/upstream_report.py`` and kept in ``jcas60/data/upstream/``, and so
+  are the reports of two other configs of the same commit: ``x10lo`` (every
+  row on one LO, a study) and ``leakage`` (the default radar with its leakage
+  model on, fmcw_radar#44: row A's leakage in the table's section 5).
 
 Local changes
 -------------

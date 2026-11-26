@@ -61,5 +61,5 @@ def test_only_what_is_read_is_vendored():
     assert not [n for n in names if "arraylink" in n or "array60" in n]
     used = (REPO / "src/jcas60").glob("*.py")
     text = "\n".join(p.read_text(encoding="utf-8") for p in used)
-    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble", "arraytx import beam", "arraytx import geometry"):
+    for mod in ("processing.detection", "processing.windows", "processing import cfar", "processing import rd", "link import compliance", "link.compression import", "ay import preamble", "arraytx import beam", "arraytx import geometry", "processing import cfarstats"):
         assert mod in text, mod
