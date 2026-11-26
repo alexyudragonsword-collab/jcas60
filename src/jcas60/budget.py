@@ -224,6 +224,29 @@ def pn_residual_shared(s: Setup, tau_s: float) -> float:
     return 2.0 * float(np.trapezoid(y, f))
 
 
+def pn_residual_paths(s: Setup, paths) -> float:
+    """The same for several static paths that share the LO, ``paths`` = ((amplitude, carrier phase [rad], delay [s]),
+    ...): their residues come from one phase process and add in amplitude --
+    Int S_phi(f) W(f) |sum_i a_i e^{j theta_i} (e^{-j 2 pi f tau_i} - 1)|^2 df over both sidebands, in the units of
+    the amplitudes squared (give the first path amplitude 1 to have it relative to that path)."""
+    f = _pn_grid(s)
+    w = undb_arr(s.fe.pn_dbchz(f)) * overlap_weight(f, s)
+    total = 0.0
+    for sign in (1.0, -1.0):
+        z = sum(a * np.exp(1j * th) * (np.exp(-2j * np.pi * sign * f * tau) - 1.0) for a, th, tau in paths)
+        total += float(np.trapezoid(np.abs(z) ** 2 * w, f))
+    return total
+
+
+def inpacket_loss_db(s: Setup, field, path_rate_mps: float) -> float:
+    """What a path whose length changes at ``path_rate_mps`` loses inside one packet: the carrier turns across the
+    correlated chips, and their sum is no longer in phase -- |mean over the correlated chips of e^{j 2 pi f_d t}|^2,
+    f_d = rate / lambda, summed over the field's correlation windows as they lie in time."""
+    fd = path_rate_mps / s.wavelength_m
+    acc = sum(np.exp(2j * np.pi * fd * (w0 + np.arange(len(ref))) / s.chip_rate_hz.value).sum() for w0, ref in field.windows)
+    return 2.0 * db(abs(acc) / field.n_correlated)
+
+
 def pn_residual_independent(s: Setup, t_ref_s: float) -> float:
     """The same for two independent LOs (bistatic), after the receiver takes out the phase it reads on the direct
     path over ``t_ref_s`` (the correlated field): Int 2 S_phi(f) (1 - sinc^2(f T)) W(f) df, both sidebands."""

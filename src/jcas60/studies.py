@@ -17,6 +17,14 @@ where it draws a conclusion (law 4):
    the map it lands and how strong (chip-domain correlation of the field
    against a copy of itself; the waveform simulation at the same delays), and
    the two roads' difference across the window up to its edge.
+4. :func:`fast_targets` -- what a fast target loses inside one packet, as a
+   closed form next to the simulation.
+5. :func:`undithered_adc` -- the ADC at the low isolation, where the thermal
+   noise is a small fraction of an LSB: the ridge and the peak's wobble as a
+   statistic over the target's delay rather than one cell's reading, and
+   what a dither buys and costs.
+6. :func:`leakage_paths` -- the leakage's delay as a variable, and a near
+   reflector as a second path whose phase-noise residue adds in amplitude.
 """
 from __future__ import annotations
 
@@ -32,7 +40,7 @@ from . import regulatory as R
 from . import sources as S
 from . import table as T
 from . import wavesim as W
-from .physconst import db, undb
+from .physconst import C0, db, undb
 from .sources import Num
 
 KEY = "jcas60.studies"
@@ -206,12 +214,113 @@ def beyond_window(s, bench) -> dict:
     return out
 
 
+# ----------------------------------------------------------------------------- 4. fast targets
+def fast_targets(s, bench) -> dict:
+    v_max = s.wavelength_m / (4.0 * s.interval_s.value)
+    vs = [s.velocity_mps.value, v_max] + [float(v) for v in S.raw(KEY + "#fast_velocities_mps")]
+    g = B.geometry(s, "monostatic")
+    delay = round(g.delay_s * s.chip_rate_hz.value) / s.chip_rate_hz.value       # on a chip: the peak is one lag's reading
+    out = []
+    for name, field in (("L-CEF", s.field), ("TRN field", s.trn_field)):
+        sim = bench.sim_for(field)
+        j = int(round(delay * sim.fs)) - sim.lag_lo
+
+        def peak(v, sim=sim, j=j):
+            return abs(sim.frame([W.Path(0.0, delay, 2.0 * v)], W.Options(noise=False, n_packets=1)).cir[0][j]) ** 2
+        at_rest = peak(0.0)
+        span = (field.windows[-1][0] + len(field.windows[-1][1]) - field.windows[0][0]) / s.chip_rate_hz.value
+        out.append({"name": name, "span_s": span,
+                    "rows": [{"velocity_mps": v, "loss_closed_db": -B.inpacket_loss_db(s, field, 2.0 * v), "loss_sim_db": -db(peak(v) / at_rest)} for v in vs]})
+    return {"fields": out, "v_unambiguous_mps": v_max}
+
+
+# ----------------------------------------------------------------------------- 5. the ADC that nothing dithers
+def _spread(values) -> dict:
+    a = np.asarray(values, dtype=float)
+    return {"median": float(np.median(a)), "min": float(a.min()), "max": float(a.max()), "rms": float(np.sqrt(np.mean(a ** 2))), "mean": float(a.mean())}
+
+
+def undithered_adc(s, bench) -> dict:
+    eirp = R.readings(s)[0].eirp_dbm
+    link = B.link(s, "monostatic", eirp)
+    sim = bench.sim
+    cost = B.monostatic_cost(s, eirp, sim.unit_envelope(s.leak_delay_s.value))
+    _label, iso, _short, leak, _enob = cost.have[0]
+    g = B.geometry(s, "monostatic")
+    n, step, enob = int(S.num(KEY + "#adc_delays").value), S.num(KEY + "#adc_delay_step_chips").value, s.adc_enob.value
+    n0 = link.noise_chip_dbm.value
+    lin: dict = {}
+
+    def at(k, dither=None):
+        tau = g.delay_s + (k - n // 2) * step / s.chip_rate_hz.value
+        paths = [W.Path(link.p_rx_dbm.value, tau, g.path_rate(s.velocity_mps.value), "target"), _leak(s, leak.value)]
+        near = int(round(tau * sim.fs))
+        if k not in lin:
+            lin[k] = bench.read(paths, bench.options("monostatic"), near, sim=sim)
+        adc = bench.read(paths, bench.options("monostatic", adc_enob=enob, adc_dither_lsb=dither), near, sim=sim)
+        return {"ridge_under_target_db": adc["ridge_dbm"] - lin[k]["peak_dbm"], "peak_change_db": adc["peak_dbm"] - lin[k]["peak_dbm"],
+                "rise_db": adc["floor_dbm"] - lin[k]["floor_dbm"], "snr_change_db": adc["snr_db"] - lin[k]["snr_db"]}
+
+    def gather(ks, dither=None):
+        rows = [at(k, dither) for k in ks]
+        q = sim.frame([W.Path(link.p_rx_dbm.value, g.delay_s, g.path_rate(s.velocity_mps.value), "target"), _leak(s, leak.value)],
+                      bench.options("monostatic", adc_enob=enob, adc_dither_lsb=dither), 0).quant
+        d = 0.0 if dither is None else float(dither)
+        # the quantiser's own noise is 1/12 LSB^2 a rail; a dither of d LSB rms adds d^2 to it
+        closed = B.floor_rise_db(B.adc_noise_inband_dbm(leak.value, enob, s) + db(1.0 + 3.0 * 4.0 * d * d), n0)
+        return {"dither_lsb": d, "delays": len(rows), "repeating_share": q["repeating_share"], "noise_lsb": q["noise_lsb"], "rise_closed_db": closed,
+                **{k: _spread([r[k] for r in rows]) for k in rows[0]}}
+    return {"isolation_db": iso.value, "leak_dbm": leak.value, "step_chips": step,
+            "cases": [gather(range(n))] + [gather(range(0, n, 2), float(d)) for d in S.raw(KEY + "#adc_dither_lsb")]}
+
+
+# ----------------------------------------------------------------------------- 6. the leakage's delay, and a second path
+def leakage_paths(s, bench) -> dict:
+    eirp = R.readings(s)[0].eirp_dbm
+    link = B.link(s, "monostatic", eirp)
+    sim = bench.sim
+    g, tgt, _ = bench.paths("monostatic", link, 0.0)
+    near = int(round(g.delay_s * sim.fs))
+    iso = s.fe.isolation_db[-1][1].value
+    level = eirp.value - s.fe.tx_gain_dbi.value - iso
+    n0 = link.noise_chip_dbm.value
+
+    def rise_sim(paths):
+        lin = bench.read([tgt] + paths, bench.options("monostatic"), near, sim=sim)
+        return bench.read([tgt] + paths, bench.options("monostatic", lo="shared"), near, sim=sim)["floor_dbm"] - lin["floor_dbm"]
+    rows = []
+    for tau in (float(x) for x in S.raw(KEY + "#leak_delays_s")):
+        st = dataclasses.replace(s, leak_delay_s=Num(tau, "assumed", KEY + "#leak_delays_s", "s"))
+        cost = B.monostatic_cost(st, eirp, sim.unit_envelope(tau))
+        rows.append({"delay_s": tau, "residual_dbc": cost.pn_residual_dbc.value, "need_pn_db": cost.need_pn_db.value,
+                     "rise_closed_db": B.floor_rise_db(level + cost.pn_residual_dbc.value, n0), "rise_sim_db": rise_sim([W.Path(level, tau, 0.0, "leakage")])})
+    # a near reflector: a second path, weaker and later, off the same LO
+    extra, rel = S.num(KEY + "#reflector_range_m").value, S.num(KEY + "#reflector_level_db").value
+    tau1 = s.leak_delay_s.value
+    tau2 = tau1 + 2.0 * extra / C0
+    a2 = math.sqrt(undb(rel))
+    phase = lambda tau: -2.0 * math.pi * s.carrier_hz.value * tau              # noqa: E731
+    alone = B.pn_residual_shared(s, tau1)
+    as_built = B.pn_residual_paths(s, ((1.0, phase(tau1), tau1), (a2, phase(tau2), tau2)))
+    span = [B.pn_residual_paths(s, ((1.0, 0.0, tau1), (a2, th, tau2))) for th in (0.0, math.pi)]
+    average = alone + a2 * a2 * B.pn_residual_shared(s, tau2)
+    base = B.monostatic_cost(s, eirp, sim.unit_envelope(tau1)).need_pn_db.value
+    both = [W.Path(level, tau1, 0.0, "leakage"), W.Path(level + rel, tau2, 0.0, "reflector")]
+    return {"isolation_db": iso, "leak_dbm": level, "rows": rows,
+            "reflector": {"range_m": extra, "level_db": rel, "delay_s": tau2, "turns": (tau2 - tau1) * s.carrier_hz.value,
+                          "need_pn_alone_db": base, "need_pn_db": base + db(as_built / alone), "need_pn_average_db": base + db(average / alone),
+                          "need_pn_min_db": base + db(min(span) / alone), "need_pn_max_db": base + db(max(span) / alone),
+                          "rise_closed_db": B.floor_rise_db(level + db(as_built), n0), "rise_sim_db": rise_sim(both),
+                          "rise_alone_closed_db": B.floor_rise_db(level + db(alone), n0)}}
+
+
 # ----------------------------------------------------------------------------- all of them
 @lru_cache(maxsize=1)
 def build() -> dict:
     s = config.setup()
     bench = _bench(s)
-    return {"setup": s, "limiter": limiter(s, bench), "gains": gain_settings(s, bench), "beyond": beyond_window(s, bench)}
+    return {"setup": s, "limiter": limiter(s, bench), "gains": gain_settings(s, bench), "beyond": beyond_window(s, bench),
+            "fast": fast_targets(s, bench), "adc": undithered_adc(s, bench), "leak": leakage_paths(s, bench)}
 
 
 def _f(v, fmt="{:.2f}") -> str:
@@ -283,4 +392,37 @@ def render(t: dict | None = None) -> str:
     for r in bw["ranges"]:
         w(f"    {r['field']:10s} {r['range_m']:5.1f} m ({r['delay_chips']:6.1f} chips): closed {r['snr_closed_db']:6.2f} dB, simulated {r['snr_sim_db']:6.2f} dB, "
           f"difference {r['snr_sim_db'] - r['snr_closed_db']:+.2f} dB")
+    w("")
+    ft = t["fast"]
+    w(f"== 4. what a fast target loses inside one packet (one packet, no noise, the target on a chip; unambiguous velocity {ft['v_unambiguous_mps']:.1f} m/s; ROADMAP item 4) ==")
+    for f in ft["fields"]:
+        w(f"  {f['name']}: the correlated chips span {f['span_s'] * 1e6:.2f} us")
+        w(f"{'radial velocity [m/s]':>26s} {'closed form':>14s} {'simulated':>12s}")
+        for r in f["rows"]:
+            w(f"{r['velocity_mps']:26.1f} {r['loss_closed_db']:11.4f} dB {r['loss_sim_db']:9.4f} dB")
+    w("  closed form: |mean over the correlated chips of exp(j 2 pi f_d t)|^2 from where the correlation windows lie; inside the unambiguous velocity the table needs no such term")
+    w("")
+    ad = t["adc"]
+    w(f"== 5. the ADC that nothing dithers ({ad['isolation_db']:g} dB of isolation: leakage {ad['leak_dbm']:g} dBm; linear receiver; the target moved over delays "
+      f"{ad['step_chips']:g} chip apart; ROADMAP item 5) ==")
+    w(f"{'dither [LSB rms]':>18s} {'delays':>7s} {'error the same in every packet':>32s} {'floor rise: closed':>20s} {'simulated':>10s} "
+      f"{'zero-Doppler ridge under the target: median (min ... max)':>60s} {'the peak moves: rms (min ... max)':>36s} {'SNR change':>12s}")
+    for c in ad["cases"]:
+        rg, pk = c["ridge_under_target_db"], c["peak_change_db"]
+        w(f"{c['dither_lsb']:18.2f} {c['delays']:7d} {c['repeating_share'] * 100:30.0f} % {c['rise_closed_db']:17.2f} dB {c['rise_db']['mean']:7.2f} dB "
+          f"{rg['median']:38.1f} dB ({rg['min']:6.1f} ... {rg['max']:6.1f}) {pk['rms']:16.2f} dB ({pk['min']:+5.2f} ... {pk['max']:+5.2f}) {c['snr_change_db']['mean']:9.2f} dB")
+    w(f"  thermal noise is {ad['cases'][0]['noise_lsb']:.2f} LSB rms; the dither is Gaussian, added ahead of the quantiser and not taken out again; the closed form counts the "
+      "quantiser's 1/12 LSB^2 and the dither as noise")
+    w("")
+    lk = t["leak"]
+    w(f"== 6. the leakage's delay, and a near reflector (shared LO; floor rise at {lk['isolation_db']:g} dB of isolation, leakage {lk['leak_dbm']:g} dBm; ROADMAP item 6) ==")
+    w(f"{'leakage delay [ns]':>20s} {'phase-noise residue':>22s} {'isolation for 1 dB':>20s} {'floor rise: closed':>20s} {'simulated':>10s}")
+    for r in lk["rows"]:
+        w(f"{r['delay_s'] * 1e9:20.2f} {r['residual_dbc']:18.1f} dBc {r['need_pn_db']:17.1f} dB {r['rise_closed_db']:17.2f} dB {r['rise_sim_db']:7.2f} dB")
+    rf = lk["reflector"]
+    w(f"  a reflector {rf['range_m'] * 100:g} cm out, {rf['level_db']:g} dB under the direct leakage (delay {rf['delay_s'] * 1e9:.3f} ns, {rf['turns']:.2f} carrier turns behind it): "
+      "the two residues come from one LO and add in amplitude")
+    w(f"      isolation for 1 dB: {rf['need_pn_alone_db']:.1f} dB without it; {rf['need_pn_db']:.1f} dB with it at this phase; {rf['need_pn_min_db']:.1f} ... {rf['need_pn_max_db']:.1f} dB "
+      f"over the phase between the paths, {rf['need_pn_average_db']:.1f} dB on average")
+    w(f"      floor rise with it: closed {rf['rise_closed_db']:.2f} dB / simulated {rf['rise_sim_db']:.2f} dB (without it: {rf['rise_alone_closed_db']:.2f} dB)")
     return "\n".join(L) + "\n"

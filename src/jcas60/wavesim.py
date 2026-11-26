@@ -58,6 +58,7 @@ class Path:
 class Options:
     noise: bool = True
     adc_enob: float | None = None      # None: no quantiser
+    adc_dither_lsb: float | None = None   # Gaussian noise of this many LSB rms on each rail ahead of the quantiser, not taken out again
     rx_p1db_dbm: float | None = None   # None: a linear receiver; else the input 1 dB point of a Rapp limiter ahead of the ADC
     lo: str | None = None              # None: no phase noise | "shared" | "independent"
     reference_lag: int | None = None   # bistatic: the lag (in samples) whose phase every packet is turned back by
@@ -223,6 +224,9 @@ class Simulator:
             if opt.adc_enob is not None:
                 if full_scale is None:                                                  # the AGC sets the range once, on the first packet's field
                     full_scale = math.sqrt(float(np.mean(np.abs(y[seg]) ** 2))) * 10.0 ** (s.adc_backoff_db.value / 20.0)
+                if opt.adc_dither_lsb:
+                    lsb = 2.0 * full_scale / 2.0 ** opt.adc_enob
+                    y = y + opt.adc_dither_lsb * lsb * (rng.standard_normal(self.n) + 1j * rng.standard_normal(self.n))
                 yq = self._quantise(y, full_scale, opt.adc_enob)
                 errors.append(yq[seg] - y[seg])
                 y = yq

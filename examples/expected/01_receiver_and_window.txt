@@ -67,3 +67,35 @@ sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11
     TRN field    5.0 m (  58.7 chips): closed  42.88 dB, simulated  42.85 dB, difference -0.03 dB
     TRN field    8.0 m (  93.9 chips): closed  35.34 dB, simulated  35.43 dB, difference +0.09 dB
     TRN field   10.0 m ( 117.4 chips): closed  31.40 dB, simulated  31.49 dB, difference +0.09 dB
+
+== 4. what a fast target loses inside one packet (one packet, no noise, the target on a chip; unambiguous velocity 12.4 m/s; ROADMAP item 4) ==
+  L-CEF: the correlated chips span 0.58 us
+     radial velocity [m/s]    closed form    simulated
+                       2.0      0.0000 dB    0.0000 dB
+                      12.4      0.0001 dB    0.0001 dB
+                      50.0      0.0020 dB    0.0020 dB
+                     200.0      0.0315 dB    0.0315 dB
+  TRN field: the correlated chips span 17.31 us
+     radial velocity [m/s]    closed form    simulated
+                       2.0      0.0028 dB    0.0028 dB
+                      12.4      0.1091 dB    0.1091 dB
+                      50.0      1.8494 dB    1.8494 dB
+                     200.0     13.2722 dB   13.2722 dB
+  closed form: |mean over the correlated chips of exp(j 2 pi f_d t)|^2 from where the correlation windows lie; inside the unambiguous velocity the table needs no such term
+
+== 5. the ADC that nothing dithers (20 dB of isolation: leakage -8 dBm; linear receiver; the target moved over delays 1.37 chip apart; ROADMAP item 5) ==
+  dither [LSB rms]  delays   error the same in every packet   floor rise: closed  simulated    zero-Doppler ridge under the target: median (min ... max)    the peak moves: rms (min ... max)   SNR change
+              0.00      16                             64 %             14.18 dB   10.58 dB                                   -3.1 dB ( -14.7 ...    3.6)             1.02 dB (+0.46 ... +1.58)     -9.62 dB
+              0.25       8                              5 %             16.54 dB   16.77 dB                                  -11.5 dB ( -15.0 ...  -10.3)             1.28 dB (-0.04 ... +2.02)    -15.73 dB
+              0.50       8                              0 %             20.07 dB   20.11 dB                                  -10.0 dB ( -13.5 ...   -6.8)             1.08 dB (-0.55 ... +1.73)    -19.65 dB
+  thermal noise is 0.06 LSB rms; the dither is Gaussian, added ahead of the quantiser and not taken out again; the closed form counts the quantiser's 1/12 LSB^2 and the dither as noise
+
+== 6. the leakage's delay, and a near reflector (shared LO; floor rise at 40 dB of isolation, leakage -28 dBm; ROADMAP item 6) ==
+  leakage delay [ns]    phase-noise residue   isolation for 1 dB   floor rise: closed  simulated
+                0.10              -44.4 dBc              43.0 dB              1.80 dB    1.86 dB
+                0.20              -38.9 dBc              48.5 dB              4.50 dB    4.55 dB
+                0.50              -34.5 dBc              52.9 dB              7.84 dB    7.90 dB
+                1.00              -34.2 dBc              53.2 dB              8.04 dB    8.09 dB
+  a reflector 2 cm out, -10 dB under the direct leakage (delay 0.233 ns, 8.07 carrier turns behind it): the two residues come from one LO and add in amplitude
+      isolation for 1 dB: 43.0 dB without it; 47.0 dB with it at this phase; 37.0 ... 47.2 dB over the phase between the paths, 44.6 dB on average
+      floor rise with it: closed 3.63 dB / simulated 3.78 dB (without it: 1.80 dB)
