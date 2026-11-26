@@ -6,8 +6,9 @@
 
 ## 报回上游（本库不改别的库；要它们做的在那个库开 issue，对方合并后本库重新 pin、验收、关 issue）
 
-### spec_sources —— pin 在 `da54721`；#54、#57、#59 已验收
+### spec_sources —— pin 在 `98b1d1b`；#54、#57、#59 已验收
 - **#59 没查到的**（公开材料里没有，不再等）：L-STF 的 17 段各是哪条序列（第 8 条）；60 GHz 接收机的 AM/PM、拟合过 Rapp 的论文、同时给 P1dB 与 IIP3 的接收链；BRP 帧的 MAC 头长度、若干次交换回一次或不回（第 13 条）。以后谁读到，在 spec_sources 开新 issue。
+- **占用带宽的两条新条目本库还没有读**（`fcc15255.radar_occupied_bandwidth`、`fcc2.occupied_bandwidth`，为 fmcw_radar#46 加的）：雷达的带宽按 §2.1049 实测，每侧 0.5 % 平均功率，含 chirp 的过冲与回扫；这句在 FCC 23-35 的正文里，没有写进条文。ay 各行按雷达读法时拿 2.16 GHz 的信道当占用的频段（§4），没有按这个口径量过；fmcw_radar 用上之后 A 行可能动，到时两个 pin 一起跟。
 - **法规没有定论，留着两种读法**（#54 已答复）：五问里四问“原文没有”，**KDB 没有查到**。ay 每行两个版本、雷达读法的空口占比“下界 … 50 %”的区间都留着。以后谁读到 KDB 或 FCC 对 WLAN sensing 的说法，在 spec_sources 开新 issue。
 
 ### mmw60_trx —— pin 在 `442fabd`；mmw60_trx#89 已验收

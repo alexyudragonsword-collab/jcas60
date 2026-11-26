@@ -1,4 +1,4 @@
-# Vendored from spec_sources@da5472183fc4b9447fbbd036d2e2d22ff30f7b0a: src/spec_sources/data/ieee80211.yaml
+# Vendored from spec_sources@98b1d1b33d091ccd3133775610ced59e8bf72c16: src/spec_sources/data/ieee80211.yaml
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 # ieee80211 —— IEEE 802.11 条文（VHT / EHT / DMG / EDMG）、TGad 评估方法学，与 ITU-R M.2003 的 DMG 条文。
 #
