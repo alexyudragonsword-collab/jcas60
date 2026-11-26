@@ -98,3 +98,110 @@ def test_inside_the_window_the_two_roads_agree_out_to_its_edge(st):
     for r in st["beyond"]["ranges"]:
         assert abs(r["snr_sim_db"] - r["snr_closed_db"]) < 0.4, r
         assert r["delay_chips"] < 120
+
+
+# ----------------------------------------------------------------------------- 4. fast targets
+def test_the_in_packet_loss_is_a_closed_form(st):
+    lcef, trn = st["fast"]["fields"]
+    for f in (lcef, trn):
+        for r in f["rows"]:
+            assert r["loss_sim_db"] == pytest.approx(r["loss_closed_db"], abs=1e-3), (f["name"], r)
+    assert st["fast"]["v_unambiguous_mps"] == pytest.approx(12.4, abs=0.05)
+    by = {round(r["velocity_mps"], 1): r["loss_closed_db"] for r in trn["rows"]}
+    assert by[2.0] < 0.01 and by[12.4] == pytest.approx(0.109, abs=0.001) and by[50.0] == pytest.approx(1.849, abs=0.001)
+    assert max(r["loss_closed_db"] for r in lcef["rows"]) < 0.05                    # the L-CEF is 30 times shorter
+    assert trn["span_s"] > 25 * lcef["span_s"]
+
+
+# ----------------------------------------------------------------------------- 5. the ADC that nothing dithers
+def test_the_undithered_adc_as_a_statistic_and_what_a_dither_costs(st):
+    plain, quarter, half = st["adc"]["cases"]
+    assert st["adc"]["isolation_db"] == 20.0 and plain["noise_lsb"] < 0.1 and (plain["dither_lsb"], quarter["dither_lsb"], half["dither_lsb"]) == (0.0, 0.25, 0.5)
+    # one cell's reading was never the quantity: over the target's delay the ridge under it spans 18 dB
+    rg = plain["ridge_under_target_db"]
+    assert rg["max"] - rg["min"] > 10.0 and rg["max"] > 0.0 and -6.0 < rg["median"] < 0.0
+    # and the quantiser's gain on the echo is not 1 for this leakage: the peak reads high at every delay
+    assert 0.3 < plain["peak_change_db"]["min"] and plain["peak_change_db"]["max"] < 2.0
+    assert plain["repeating_share"] > 0.5 and plain["rise_db"]["mean"] < plain["rise_closed_db"] - 3.0
+    # a dither makes the error noise -- the closed form holds again -- and the noise is worse than what it replaced
+    for c in (quarter, half):
+        assert c["repeating_share"] < 0.1 and abs(c["rise_db"]["mean"] - c["rise_closed_db"]) < 0.4
+        assert c["snr_change_db"]["mean"] < plain["snr_change_db"]["mean"] - 5.0
+    assert half["repeating_share"] < 0.01
+
+
+# ----------------------------------------------------------------------------- 6. the leakage's delay
+def test_the_phase_noise_residue_against_the_leakage_delay_and_a_second_path(st):
+    lk = st["leak"]
+    rows = lk["rows"]
+    assert [round(r["delay_s"] * 1e9, 2) for r in rows] == [0.1, 0.2, 0.5, 1.0]
+    for r in rows:
+        assert abs(r["rise_sim_db"] - r["rise_closed_db"]) < 0.2                     # law 4
+    need = [r["need_pn_db"] for r in rows]
+    assert need == sorted(need) and need[1] - need[0] == pytest.approx(5.5, abs=0.1)
+    assert need[3] - need[2] < 0.5 and need[3] == pytest.approx(53.2, abs=0.06)      # it saturates: beyond 0.5 ns the residue is the LO's own noise twice
+    rf = lk["reflector"]
+    assert rf["need_pn_min_db"] < rf["need_pn_alone_db"] < rf["need_pn_average_db"] < rf["need_pn_db"] <= rf["need_pn_max_db"]
+    assert rf["need_pn_db"] == pytest.approx(47.0, abs=0.06) and rf["need_pn_average_db"] == pytest.approx(44.6, abs=0.06)
+    assert abs(rf["rise_sim_db"] - rf["rise_closed_db"]) < 0.3 and rf["rise_closed_db"] > rf["rise_alone_closed_db"] + 1.0
+
+
+def test_two_paths_off_one_lo_reduce_to_one():
+    """The several-path residue with one path is the one-path residue; with two equal paths at the same delay and
+    opposite phase it is nothing."""
+    from jcas60 import budget, config
+    s = config.setup()
+    tau = s.leak_delay_s.value
+    one = budget.pn_residual_shared(s, tau)
+    assert budget.pn_residual_paths(s, ((1.0, 0.3, tau),)) == pytest.approx(one, rel=1e-12)
+    assert budget.pn_residual_paths(s, ((1.0, 0.0, tau), (1.0, math.pi, tau))) < 1e-20 * one + 1e-30
+    assert budget.pn_residual_paths(s, ((1.0, 0.0, tau), (1.0, 0.0, tau))) == pytest.approx(4.0 * one, rel=1e-12)
+
+
+# ----------------------------------------------------------------------------- 7. one LO for every row
+def test_every_row_on_the_x10_lo(st):
+    lo = st["lo"]
+    a, ax = lo["row_a"]["default"], lo["row_a"]["x10lo"]
+    assert ax["snr_cell_db"] == pytest.approx(a["snr_cell_db"], abs=0.01)          # row A is thermal-noise limited at 5 m: its LO does not show
+    assert ax["lo_rms_rad"] < a["lo_rms_rad"] and "x10" in ax["lo_source"]
+    model, x10 = lo["rows"]
+    assert model["need_pn_db"] == pytest.approx(43.0, abs=0.06) and x10["need_pn_db"] == pytest.approx(39.0, abs=0.06)
+    assert model["binding"] == x10["binding"] == "in-band compression" and x10["need_db"] == model["need_db"]   # the shortfall does not move
+    for r in (model, x10):
+        assert abs(r["rise_sim_db"] - r["rise_closed_db"]) < 0.2                   # law 4, monostatic
+        for c in r["bistatic"]:
+            assert abs(c["rise_sim_db"] - c["rise_closed_db"]) < 0.3, c            # ... and bistatic, on both fields
+    # what the closed form said while it referenced over the whole correlated span: more than 1 dB from the simulation on the TRN field
+    trn = model["bistatic"][1]
+    assert trn["rise_whole_field_closed_db"] - trn["rise_sim_db"] > 1.0 and trn["span_s"] > 30 * trn["reference_s"]
+
+
+def test_the_x10_lo_is_the_vendored_profile_and_the_table_does_not_use_it():
+    import numpy as np
+
+    from jcas60 import config, frontend
+    fe = config.setup().fe
+    assert fe.pn_profile is None and fe is frontend.shared()                       # law 2: the table's one instance is untouched
+    x = frontend.with_x10_lo(fe)
+    assert float(x.pn_dbchz(1e6)) == pytest.approx(-98.5, abs=0.1) and float(x.pn_dbchz(1e8)) == pytest.approx(-133.5, abs=0.1)
+    assert float(x.pn_dbchz(1.0)) == float(x.pn_dbchz(100.0)) and float(fe.pn_dbchz(1e6)) == pytest.approx(-93.0, abs=0.05)
+    assert np.all(np.diff(x.pn_profile[0]) > 0) and dataclass_fields_equal(fe, x)
+
+
+def dataclass_fields_equal(a, b) -> bool:
+    import dataclasses
+    return all(getattr(a, f.name) == getattr(b, f.name) for f in dataclasses.fields(a) if f.name != "pn_profile")
+
+
+# ----------------------------------------------------------------------------- 8. the bistatic rows' synchronisation
+def test_the_leftover_carrier_offset_is_the_fast_targets_loss(st):
+    lcef, trn = st["sync"]["fields"]
+    for f in (lcef, trn):
+        rows = {round(r["cfo_hz"]): r for r in f["rows"]}
+        assert set(rows) == {5000, 50000, 2420000}
+        assert abs(rows[5000]["loss_sim_db"] - rows[5000]["loss_closed_db"]) < 0.002
+        assert abs(rows[50000]["loss_sim_db"] - rows[50000]["loss_closed_db"]) < 0.01
+        assert abs(rows[2420000]["loss_sim_db"] - rows[2420000]["loss_closed_db"]) < 0.1 and rows[2420000]["loss_closed_db"] > 10.0
+    t5 = {round(r["cfo_hz"]): r for r in trn["rows"]}[5000]
+    assert 0.05 < t5["loss_closed_db"] < 0.11                                       # 5 kHz across the TRN field: under a tenth of a dB
+    assert st["sync"]["equivalent_mps_per_hz"] * 5000 == pytest.approx(12.4, abs=0.05)

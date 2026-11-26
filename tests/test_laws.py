@@ -216,7 +216,7 @@ def test_law4_the_receivers_cost_has_both_roads_where_the_closed_form_claims_to_
         assert abs(r["snr_sim_db"] - r["snr_closed_db"]) < 0.15 and r["image_sim_dbc"] < r["image_closed_dbc"], r["level_dbm"]
     assert 3.0 < -sweep["snr_limit_closed_db"] < 3.3                                   # a limiter never costs the echo much more than 3 dB of SNR
     for blk in t["bistatic"]:
-        assert abs(blk["pn_rise_sim_db"] - blk["pn_rise_closed_db"]) < 1.0
+        assert abs(blk["pn_rise_sim_db"] - blk["pn_rise_closed_db"]) < 0.3            # 0.37-0.44 dB apart until the closed form took one window, not the field
 
 
 # ----------------------------------------------------------------------------- law 7: wording

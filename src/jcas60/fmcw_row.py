@@ -29,6 +29,13 @@ def _loaded() -> dict:
     return json.loads(RECORD.read_text(encoding="utf-8"))
 
 
+@lru_cache(maxsize=4)
+def variant(name: str) -> dict:
+    """The report of another config of the same pinned commit (``tools/upstream_report.py``'s VARIANTS), for the
+    studies; row A is never read from one."""
+    return json.loads(RECORD.with_name(f"fmcw_radar_budget_{name}.json").read_text(encoding="utf-8"))
+
+
 def provenance() -> dict:
     return dict(_loaded()["_provenance"])
 

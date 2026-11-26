@@ -58,10 +58,12 @@ class Path:
 class Options:
     noise: bool = True
     adc_enob: float | None = None      # None: no quantiser
+    adc_dither_lsb: float | None = None   # Gaussian noise of this many LSB rms on each rail ahead of the quantiser, not taken out again
     rx_p1db_dbm: float | None = None   # None: a linear receiver; else the input 1 dB point of a Rapp limiter ahead of the ADC
     lo: str | None = None              # None: no phase noise | "shared" | "independent"
     reference_lag: int | None = None   # bistatic: the lag (in samples) whose phase every packet is turned back by
     random_packet_phase: bool = False  # bistatic: an unknown carrier phase per packet (no common LO)
+    cfo_hz: float = 0.0                # bistatic: what is left of the two devices' carrier offset, turning everything received
     seed: int = 1
     n_packets: int | None = None       # default: the setup's
 
@@ -210,6 +212,8 @@ class Simulator:
                 fd = -p.path_rate_mps / lam                                             # receding: negative Doppler
                 wave = np.fft.ifft(tx_f * np.exp(-2j * np.pi * self.g_freq * tau))
                 y += (math.sqrt(undb(p.power_dbm)) * scale * np.exp(-2j * np.pi * s.carrier_hz.value * tau)) * wave * np.exp(2j * np.pi * fd * self.g_t)
+            if opt.cfo_hz:
+                y *= np.exp(2j * np.pi * opt.cfo_hz * (self.g_t + t_k))
             if opt.random_packet_phase:
                 y *= np.exp(2j * np.pi * rng.uniform())
             if phi_rx is not None:
@@ -223,6 +227,9 @@ class Simulator:
             if opt.adc_enob is not None:
                 if full_scale is None:                                                  # the AGC sets the range once, on the first packet's field
                     full_scale = math.sqrt(float(np.mean(np.abs(y[seg]) ** 2))) * 10.0 ** (s.adc_backoff_db.value / 20.0)
+                if opt.adc_dither_lsb:
+                    lsb = 2.0 * full_scale / 2.0 ** opt.adc_enob
+                    y = y + opt.adc_dither_lsb * lsb * (rng.standard_normal(self.n) + 1j * rng.standard_normal(self.n))
                 yq = self._quantise(y, full_scale, opt.adc_enob)
                 errors.append(yq[seg] - y[seg])
                 y = yq

@@ -113,7 +113,7 @@ def record() -> dict:
     # the studies beside the table (ROADMAP items; example 01)
     from jcas60 import studies
     st = studies.build()
-    for k in ("limiter", "gains", "beyond"):
+    for k in sorted(k for k in st if k != "setup"):
         _flat(f"studies.{k}", st[k], out)
     _flat("studies.text", hashlib.sha256(studies.render(st).encode()).hexdigest(), out)
     return out

@@ -67,3 +67,58 @@ sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11
     TRN field    5.0 m (  58.7 chips): closed  42.88 dB, simulated  42.85 dB, difference -0.03 dB
     TRN field    8.0 m (  93.9 chips): closed  35.34 dB, simulated  35.43 dB, difference +0.09 dB
     TRN field   10.0 m ( 117.4 chips): closed  31.40 dB, simulated  31.49 dB, difference +0.09 dB
+
+== 4. what a fast target loses inside one packet (one packet, no noise, the target on a chip; unambiguous velocity 12.4 m/s; ROADMAP item 4) ==
+  L-CEF: the correlated chips span 0.58 us
+     radial velocity [m/s]    closed form    simulated
+                       2.0      0.0000 dB    0.0000 dB
+                      12.4      0.0001 dB    0.0001 dB
+                      50.0      0.0020 dB    0.0020 dB
+                     200.0      0.0315 dB    0.0315 dB
+  TRN field: the correlated chips span 17.31 us
+     radial velocity [m/s]    closed form    simulated
+                       2.0      0.0028 dB    0.0028 dB
+                      12.4      0.1091 dB    0.1091 dB
+                      50.0      1.8494 dB    1.8494 dB
+                     200.0     13.2722 dB   13.2722 dB
+  closed form: |mean over the correlated chips of exp(j 2 pi f_d t)|^2 from where the correlation windows lie; inside the unambiguous velocity the table needs no such term
+
+== 5. the ADC that nothing dithers (20 dB of isolation: leakage -8 dBm; linear receiver; the target moved over delays 1.37 chip apart; ROADMAP item 5) ==
+  dither [LSB rms]  delays   error the same in every packet   floor rise: closed  simulated    zero-Doppler ridge under the target: median (min ... max)    the peak moves: rms (min ... max)   SNR change
+              0.00      16                             64 %             14.18 dB   10.58 dB                                   -3.1 dB ( -14.7 ...    3.6)             1.02 dB (+0.46 ... +1.58)     -9.62 dB
+              0.25       8                              5 %             16.54 dB   16.77 dB                                  -11.5 dB ( -15.0 ...  -10.3)             1.28 dB (-0.04 ... +2.02)    -15.73 dB
+              0.50       8                              0 %             20.07 dB   20.11 dB                                  -10.0 dB ( -13.5 ...   -6.8)             1.08 dB (-0.55 ... +1.73)    -19.65 dB
+  thermal noise is 0.06 LSB rms; the dither is Gaussian, added ahead of the quantiser and not taken out again; the closed form counts the quantiser's 1/12 LSB^2 and the dither as noise
+
+== 6. the leakage's delay, and a near reflector (shared LO; floor rise at 40 dB of isolation, leakage -28 dBm; ROADMAP item 6) ==
+  leakage delay [ns]    phase-noise residue   isolation for 1 dB   floor rise: closed  simulated
+                0.10              -44.4 dBc              43.0 dB              1.80 dB    1.86 dB
+                0.20              -38.9 dBc              48.5 dB              4.50 dB    4.55 dB
+                0.50              -34.5 dBc              52.9 dB              7.84 dB    7.90 dB
+                1.00              -34.2 dBc              53.2 dB              8.04 dB    8.09 dB
+  a reflector 2 cm out, -10 dB under the direct leakage (delay 0.233 ns, 8.07 carrier turns behind it): the two residues come from one LO and add in amplitude
+      isolation for 1 dB: 43.0 dB without it; 47.0 dB with it at this phase; 37.0 ... 47.2 dB over the phase between the paths, 44.6 dB on average
+      floor rise with it: closed 3.63 dB / simulated 3.78 dB (without it: 1.80 dB)
+
+== 7. every row on one LO: mmw60_trx's x10 LO in the place of each row's own (the table keeps fmcw_radar's default config; ROADMAP item 6) ==
+  A   fmcw_radar's default config  SNR(cell) 43.34 dB; LO 0.319 rad rms; phase-noise floor of the map: mean -65.0 dBc, at the target -80.4 dBc   (vendored ADPLL analyze() at 15 GHz x4, the DCO alone above fref/2 (source: assumed))
+  A'  its radar_60g_x10lo.yaml     SNR(cell) 43.34 dB; LO 0.273 rad rms; phase-noise floor of the map: mean -66.6 dBc, at the target -81.8 dBc   (pllsim_wu19_x10_60p48g_floor150.yaml: pllsim preset bench_wu19_spll_frac_52m_6p253g, linear model (analyze), pllsim 0+unknown, commit d67043e11976 x4; plus the chirp generator's TDC and DCO quantisation (the vendored ADPLL's analyze()))
+  the ay rows (communication limit; floor rises at 40 dB of isolation for B, on the direct path for C):
+                                          LO   L(1 MHz)  L(100 MHz)   B: residue   isolation for 1 dB   of all three    floor rise closed / sim   C, L-CEF: closed / sim   C, TRN field: closed / sim
+              the model the table's rows use      -93.0      -127.0    -44.4 dBc              43.0 dB        43.2 dB            1.80 / 1.86 dB          0.93 / 0.89 dB              0.93 / 0.76 dB
+                          mmw60_trx's x10 LO      -98.5      -133.5    -48.4 dBc              39.0 dB        43.2 dB            0.82 / 0.88 dB          0.21 / 0.24 dB              0.21 / 0.04 dB
+      the model the table's rows use: B is bound by in-band compression; C's residue -25.6 dBc, the phase noise less its mean over one correlation window (0.29 us); taken over the whole correlated span instead the closed form would say 1.26 dB (L-CEF, 0.58 us) and 1.85 dB (TRN field, 17.31 us)
+      mmw60_trx's x10 LO: B is bound by in-band compression; C's residue -32.4 dBc, the phase noise less its mean over one correlation window (0.29 us); taken over the whole correlated span instead the closed form would say 0.33 dB (L-CEF, 0.58 us) and 0.68 dB (TRN field, 17.31 us)
+
+== 8. the bistatic rows: the carrier offset the two devices are left with (one frame, no noise; every packet's phase taken from the direct path; ROADMAP item 7) ==
+  L-CEF:
+          offset    as a velocity   turns across the field   the target loses: closed    simulated
+           5 kHz         12.4 m/s                    0.004                  0.0001 dB   -0.0000 dB
+          50 kHz        123.9 m/s                    0.036                  0.0118 dB    0.0105 dB
+        2420 kHz       5997.8 m/s                    1.760                 13.2838 dB   13.3489 dB
+  TRN field:
+          offset    as a velocity   turns across the field   the target loses: closed    simulated
+           5 kHz         12.4 m/s                    0.087                  0.0785 dB    0.0784 dB
+          50 kHz        123.9 m/s                    0.873                 16.0796 dB   16.0785 dB
+        2420 kHz       5997.8 m/s                   42.240                 29.3234 dB   29.2965 dB
+  between packets nothing is left: the offset is common to the target and to the direct path the phase is read on; inside a packet it is the fast target's loss of section 4, the offset added to the target's own Doppler

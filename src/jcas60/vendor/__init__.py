@@ -33,7 +33,10 @@ Pins
   - ``data/spec/survey.yaml`` (its own table: the SC pulse and the converter
     model are read from it by key),
   - ``examples/expected/04_comparison_table.txt`` (its comparison table as
-    printed: the ay_sc row's rate is read from it).
+    printed: the ay_sc row's rate is read from it),
+  - ``data/clock_profiles/pllsim_wu19_x10_60p48g_floor150.yaml`` (its x10 LO's
+    phase-noise profile: the one fmcw_radar's ``radar_60g_x10lo.yaml`` reads,
+    for the study that gives every row that LO; the table's rows do not use it).
 
   ``ay/training.py`` is NOT copied: it builds the OFDM-rate EDMG-STF / EDMG-CEF,
   and it imports mmw60's ``spec`` shim (its local table plus a second, older

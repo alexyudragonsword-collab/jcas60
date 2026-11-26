@@ -1,0 +1,860 @@
+{
+ "_provenance": {
+  "command": "python tools/budget_report.py configs/radar_60g_x10lo.yaml --json <out>",
+  "config": "configs/radar_60g_x10lo.yaml",
+  "repo": "fmcw_radar",
+  "sha": "c303566180c2ef22bd2bf6ffaa1f08e59174e110"
+ },
+ "report": {
+  "angle": {},
+  "budget": [
+   {
+    "term": "EIRP",
+    "unit": "dBm",
+    "value": 14.0
+   },
+   {
+    "term": "free-space path loss (4pi)^3 R^4 / lambda^2",
+    "unit": "dB",
+    "value": 106.96170704321796
+   },
+   {
+    "term": "oxygen over 2R",
+    "unit": "dB",
+    "value": 0.14651
+   },
+   {
+    "term": "extra two-way loss",
+    "unit": "dB",
+    "value": 0.0
+   },
+   {
+    "term": "RCS",
+    "unit": "dBsm",
+    "value": -10.0
+   },
+   {
+    "term": "received power P_r",
+    "unit": "dBm",
+    "value": -93.10821704321796
+   },
+   {
+    "term": "signal at the ADC",
+    "unit": "dBm",
+    "value": -53.10821704321796
+   },
+   {
+    "term": "thermal noise density at the antenna k T0 F",
+    "unit": "dBm/Hz",
+    "value": -161.97518719422808
+   },
+   {
+    "term": "thermal noise density at the ADC",
+    "unit": "dBm/Hz",
+    "value": -121.97518719422808
+   },
+   {
+    "term": "ADC quantisation noise density",
+    "unit": "dBm/Hz",
+    "value": -140.0
+   },
+   {
+    "term": "total noise density at the ADC",
+    "unit": "dBm/Hz",
+    "value": -121.90728194549712
+   },
+   {
+    "term": "C/N0",
+    "unit": "dBHz",
+    "value": 68.79906490227916
+   },
+   {
+    "term": "SNR, one chirp, one range bin",
+    "unit": "dB",
+    "value": 27.038152311722342
+   },
+   {
+    "term": "SNR, one range-Doppler cell",
+    "unit": "dB",
+    "value": 43.339039461004404
+   },
+   {
+    "term": "SNR, rectangular windows (matched filter)",
+    "unit": "dB",
+    "value": 46.86086464211803
+   },
+   {
+    "term": "window loss",
+    "unit": "dB",
+    "value": 3.521825181113627
+   },
+   {
+    "term": "in-band P1dB margin (input, target only)",
+    "unit": "dB",
+    "value": 59.10821704321796
+   }
+  ],
+  "budget_capped": [
+   {
+    "term": "EIRP",
+    "unit": "dBm",
+    "value": 14.0
+   },
+   {
+    "term": "free-space path loss (4pi)^3 R^4 / lambda^2",
+    "unit": "dB",
+    "value": 106.96170704321796
+   },
+   {
+    "term": "oxygen over 2R",
+    "unit": "dB",
+    "value": 0.14651
+   },
+   {
+    "term": "extra two-way loss",
+    "unit": "dB",
+    "value": 0.0
+   },
+   {
+    "term": "RCS",
+    "unit": "dBsm",
+    "value": -10.0
+   },
+   {
+    "term": "received power P_r",
+    "unit": "dBm",
+    "value": -93.10821704321796
+   },
+   {
+    "term": "signal at the ADC",
+    "unit": "dBm",
+    "value": -53.10821704321796
+   },
+   {
+    "term": "thermal noise density at the antenna k T0 F",
+    "unit": "dBm/Hz",
+    "value": -161.97518719422808
+   },
+   {
+    "term": "thermal noise density at the ADC",
+    "unit": "dBm/Hz",
+    "value": -121.97518719422808
+   },
+   {
+    "term": "ADC quantisation noise density",
+    "unit": "dBm/Hz",
+    "value": -140.0
+   },
+   {
+    "term": "total noise density at the ADC",
+    "unit": "dBm/Hz",
+    "value": -121.90728194549712
+   },
+   {
+    "term": "C/N0",
+    "unit": "dBHz",
+    "value": 68.79906490227916
+   },
+   {
+    "term": "SNR, one chirp, one range bin",
+    "unit": "dB",
+    "value": 27.038152311722342
+   },
+   {
+    "term": "SNR, one range-Doppler cell",
+    "unit": "dB",
+    "value": 43.339039461004404
+   },
+   {
+    "term": "SNR, rectangular windows (matched filter)",
+    "unit": "dB",
+    "value": 46.86086464211803
+   },
+   {
+    "term": "window loss",
+    "unit": "dB",
+    "value": 3.521825181113627
+   },
+   {
+    "term": "in-band P1dB margin (input, target only)",
+    "unit": "dB",
+    "value": 59.10821704321796
+   }
+  ],
+  "cfar": {
+   "cells_in_band": 102400,
+   "cfar_loss_db": 0.4909108747541602,
+   "correlation_length_doppler": 1.9444444444444444,
+   "correlation_length_range": 7.777777777777778,
+   "cut_correlation": 0.015117294638725683,
+   "false_alarm_cells_per_frame": 10.45096731176793,
+   "ghost_detections_per_frame": 0.5236080538960166,
+   "ghosts": [
+    {
+     "floor_dbc": -43.13500386074707,
+     "in_view": false,
+     "level_dbc": -34.072575267682005,
+     "level_map_dbc": -34.072575267682005,
+     "noise_shift_db": 0.0,
+     "offset_m": -10.305365743749999,
+     "pd": 0.4037414462702014,
+     "pn_floor_dbc": -79.3272306031455,
+     "range_m": -5.305365743749999,
+     "snr_db": 9.062428593065064
+    },
+    {
+     "floor_dbc": -43.115852977303646,
+     "in_view": true,
+     "level_dbc": -35.18795936921869,
+     "level_map_dbc": -35.18795936921869,
+     "noise_shift_db": 0.0,
+     "offset_m": 2.8105542937499997,
+     "pd": 0.24785340907593909,
+     "pn_floor_dbc": -66.45142080821105,
+     "range_m": 7.81055429375,
+     "snr_db": 7.927893608084958
+    },
+    {
+     "floor_dbc": -43.115852977303646,
+     "in_view": true,
+     "level_dbc": -35.474895114357196,
+     "level_map_dbc": -35.474895114357196,
+     "noise_shift_db": 0.0,
+     "offset_m": -2.8105542937499997,
+     "pd": 0.21647031586900956,
+     "pn_floor_dbc": -66.45142080821105,
+     "range_m": 2.1894457062500003,
+     "snr_db": 7.6409578629464505
+    },
+    {
+     "floor_dbc": -43.11188375084004,
+     "in_view": true,
+     "level_dbc": -37.9641397016512,
+     "level_map_dbc": -37.9641397016512,
+     "noise_shift_db": 0.0,
+     "offset_m": 4.68425715625,
+     "pd": 0.05928432895106797,
+     "pn_floor_dbc": -65.67013263195824,
+     "range_m": 9.68425715625,
+     "snr_db": 5.147744049188844
+    },
+    {
+     "floor_dbc": -43.11288665991887,
+     "in_view": false,
+     "level_dbc": -37.965441264486294,
+     "level_map_dbc": -37.965441264486294,
+     "noise_shift_db": 0.0,
+     "offset_m": -15.9358428455625,
+     "pd": 0.05927472235551231,
+     "pn_floor_dbc": -65.85473346402141,
+     "range_m": -10.9358428455625,
+     "snr_db": 5.147445395432577
+    },
+    {
+     "floor_dbc": -43.1216827204336,
+     "in_view": false,
+     "level_dbc": -38.36148222417893,
+     "level_map_dbc": -38.36148222417893,
+     "noise_shift_db": 0.0,
+     "offset_m": -12.179068606249999,
+     "pd": 0.04802544532255627,
+     "pn_floor_dbc": -67.93367058051668,
+     "range_m": -7.179068606249999,
+     "snr_db": 4.760200496254669
+    }
+   ],
+   "ghosts_vouched": true,
+   "guard_bins_doppler": 2.0,
+   "guard_bins_range": 0.5,
+   "independent_looks": 6770.938775510204,
+   "n_looks": 1,
+   "n_train": 416,
+   "n_train_eff": 33.36936231785801,
+   "pd_target": 1.0,
+   "pfa_cell": 0.00010206022765398369,
+   "pfa_cut_only": 2.6442439278103325e-05,
+   "pfa_design": 0.0001,
+   "pfa_first_order": 9.495249918215283e-05,
+   "pfa_training_only": 0.00027088060362426107,
+   "range_pad": 4,
+   "snr_look_db": 43.13604765241457,
+   "snr_pd90_db": 12.239994299053524,
+   "threshold_factor": 9.313056604394639,
+   "threshold_factor_effective": 10.675212566257876,
+   "tone_leak": 0.0061796403274867505,
+   "window_half_doppler": 10,
+   "window_half_range": 10
+  },
+  "chirp": {
+   "dco_dev_frac_p99": 0.033,
+   "dp_cal_passes": [
+    2.1029813354477846e-05,
+    2.3022792587346307e-05
+   ],
+   "dp_gain_used": 0.9999559488504826,
+   "engine": "event",
+   "floor_rms_hz": 1242142.2784850374,
+   "flyback_step_hz": -3999600000.0,
+   "initial_error_hz": 398400.0,
+   "mean_hz": -40.0,
+   "notes": [
+    "TDC quantization follows the modulation: 0.09 TDC bins of RMS dither, under 0.5.  The modulation sweeps the TDC across bins deterministically, so the quantization error repeats with it from one modulation period to the next.  Its PSD level can still agree with analyze(); what fails is the randomness: averaging or coherently integrating over periods does not reduce it (measured on a 12.2 ps TDC, 1 ps jitter, 0.08 bin: the part common to all ramps 3-8 dB below the total at 0.3-10 MHz, against 12 dB for random noise over 16 ramps).  TDCConfig.dither_lsb breaks it up without adding noise (2 LSB or more clears this note); more TDC jitter does too, at the cost of in-band noise.",
+    "jitter integrated to 45 MHz (0.45x the reference-edge record rate), not the full 50 MHz band the linear model integrates \u2014 compare the two only over the common band"
+   ],
+   "peak_hz": 2600000.0,
+   "rms_hz": 1216677.4422171228,
+   "settle_band_hz": 6210711.392425187,
+   "settle_s": 0.0,
+   "ui_per_ref_cycle_p99": 4.95,
+   "vouches_for_spurs": true
+  },
+  "compliance": {
+   "applies": true,
+   "compliant": true,
+   "conducted_dbm": 4.0,
+   "eirp_cap_dbm": 14.0,
+   "eirp_dbm": 14.0,
+   "eirp_margin_db": 0.0,
+   "frame_on_s": 0.0064,
+   "frame_period_s": 0.03333333333333333,
+   "governing": "radar_57_64",
+   "limit_dbm": 14.0,
+   "max_frame_rate_hz": 31.347962383427838,
+   "min_frame_period_s": 0.031899999999,
+   "n_tx": 1,
+   "off_time_required_s": 0.0255,
+   "readings": [
+    "'Indoor', 'outdoor', 'fixed' and 'vehicular' are not defined in the rule: the config's regulatory.scenario is taken at its word.",
+    "The occupied band is taken as the commanded sweep (center +- sweep / 2); the rule does not say how it is measured, and no margin is kept for the temperature and supply range of paragraph (f).",
+    "An off-time counts if it is continuous for at least 2 ms; of one the 33 ms interval cuts, the part inside the interval counts.",
+    "The rule does not say how several transmit channels add.  TDM: one transmitter is on at a time, the EIRP is one transmitter's.",
+    "Peak EIRP is taken as tx_power_dbm - tx_backoff_db + tx_gain_dbi, peak conducted power as tx_power_dbm - tx_backoff_db; the rule gives no measurement bandwidth."
+   ],
+   "rule": "47 CFR 15.255(c)(2)",
+   "scenario": null,
+   "snr_cell_capped_db": 43.339039461004404,
+   "snr_cell_configured_db": 43.339039461004404,
+   "sources": {
+    "band": "spec",
+    "tx_backoff_db": "assumed",
+    "tx_gain_dbi": "assumed",
+    "tx_power_dbm": "spec"
+   },
+   "sweep_ghz": [
+    58.0,
+    62.0
+   ],
+   "tiers": [
+    {
+     "band_ghz": [
+      57.0,
+      71.0
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": -10.0,
+     "conducted_margin_db": -14.0,
+     "eirp_margin_db": -4.0,
+     "in_band": true,
+     "label": "default: any field disturbance sensor / radar in the band",
+     "max_frame_rate_hz": null,
+     "min_frame_period_s": null,
+     "off_time": "none required",
+     "off_time_have_s": null,
+     "off_time_required_s": null,
+     "peak_eirp_limit_dbm": 10.0,
+     "power_ok": false,
+     "scenario": "any",
+     "sources": {
+      "band": "spec",
+      "peak_conducted_dbm": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_default",
+     "usable": true
+    },
+    {
+     "band_ghz": [
+      57.0,
+      59.4
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 6.0,
+     "in_band": false,
+     "label": "57.0-59.4 GHz, indoor",
+     "max_frame_rate_hz": null,
+     "min_frame_period_s": null,
+     "off_time": "none required",
+     "off_time_have_s": null,
+     "off_time_required_s": null,
+     "peak_eirp_limit_dbm": 20.0,
+     "power_ok": true,
+     "scenario": "not declared",
+     "sources": {
+      "band": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_57_59p4_indoor",
+     "usable": false
+    },
+    {
+     "band_ghz": [
+      57.0,
+      59.4
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 16.0,
+     "in_band": false,
+     "label": "57.0-59.4 GHz, outdoor",
+     "max_frame_rate_hz": null,
+     "min_frame_period_s": null,
+     "off_time": "none required",
+     "off_time_have_s": null,
+     "off_time_required_s": null,
+     "peak_eirp_limit_dbm": 30.0,
+     "power_ok": true,
+     "scenario": "not declared",
+     "sources": {
+      "band": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_57_59p4_outdoor",
+     "usable": false
+    },
+    {
+     "band_ghz": [
+      57.0,
+      61.56
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": -11.0,
+     "in_band": false,
+     "label": "57.0-61.56 GHz, no off-time",
+     "max_frame_rate_hz": null,
+     "min_frame_period_s": null,
+     "off_time": "none required",
+     "off_time_have_s": null,
+     "off_time_required_s": null,
+     "peak_eirp_limit_dbm": 3.0,
+     "power_ok": false,
+     "scenario": "any",
+     "sources": {
+      "band": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_57_61p56",
+     "usable": false
+    },
+    {
+     "band_ghz": [
+      57.0,
+      61.56
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 6.0,
+     "in_band": false,
+     "label": "57.0-61.56 GHz, with off-time",
+     "max_frame_rate_hz": 68.25938566785868,
+     "min_frame_period_s": 0.0146499999995,
+     "off_time": "met",
+     "off_time_have_s": 0.0266,
+     "off_time_required_s": 0.0165,
+     "peak_eirp_limit_dbm": 20.0,
+     "power_ok": true,
+     "scenario": "any",
+     "sources": {
+      "band": "spec",
+      "off_time": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_57_61p56_off_time",
+     "usable": false
+    },
+    {
+     "band_ghz": [
+      57.0,
+      64.0
+     ],
+     "bandwidth_ok": null,
+     "compliant": true,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 0.0,
+     "in_band": true,
+     "label": "57.0-64.0 GHz, with off-time",
+     "max_frame_rate_hz": 31.347962383427838,
+     "min_frame_period_s": 0.031899999999,
+     "off_time": "met",
+     "off_time_have_s": 0.0266,
+     "off_time_required_s": 0.0255,
+     "peak_eirp_limit_dbm": 14.0,
+     "power_ok": true,
+     "scenario": "any",
+     "sources": {
+      "band": "spec",
+      "off_time": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_57_64",
+     "usable": true
+    },
+    {
+     "band_ghz": [
+      57.0,
+      64.0
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 6.0,
+     "in_band": true,
+     "label": "57.0-64.0 GHz, outdoors fixed or vehicular, with off-time",
+     "max_frame_rate_hz": 68.25938566785868,
+     "min_frame_period_s": 0.0146499999995,
+     "off_time": "met",
+     "off_time_have_s": 0.0266,
+     "off_time_required_s": 0.0165,
+     "peak_eirp_limit_dbm": 20.0,
+     "power_ok": true,
+     "scenario": "not declared",
+     "sources": {
+      "band": "spec",
+      "off_time": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_57_64_outdoor",
+     "usable": false
+    },
+    {
+     "band_ghz": [
+      61.0,
+      61.5
+     ],
+     "bandwidth_ok": false,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 29.0,
+     "in_band": false,
+     "label": "61.0-61.5 GHz, 500 MHz or less",
+     "max_frame_rate_hz": null,
+     "min_frame_period_s": null,
+     "off_time": "none required",
+     "off_time_have_s": null,
+     "off_time_required_s": null,
+     "peak_eirp_limit_dbm": 43.0,
+     "power_ok": true,
+     "scenario": "any",
+     "sources": {
+      "band": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_61_61p5",
+     "usable": false
+    },
+    {
+     "band_ghz": [
+      60.0,
+      64.0
+     ],
+     "bandwidth_ok": null,
+     "compliant": false,
+     "conducted_limit_dbm": null,
+     "conducted_margin_db": null,
+     "eirp_margin_db": 6.0,
+     "in_band": false,
+     "label": "60-64 GHz on an unmanned aircraft, with off-time",
+     "max_frame_rate_hz": 68.25938566785868,
+     "min_frame_period_s": 0.0146499999995,
+     "off_time": "met",
+     "off_time_have_s": 0.0266,
+     "off_time_required_s": 0.0165,
+     "peak_eirp_limit_dbm": 20.0,
+     "power_ok": true,
+     "scenario": "not declared",
+     "sources": {
+      "band": "spec",
+      "off_time": "spec",
+      "peak_eirp_dbm": "spec"
+     },
+     "tier": "radar_uav_60_64",
+     "usable": false
+    }
+   ],
+   "tx_backoff_db": 8.0,
+   "tx_power_dbm": 12.0,
+   "verdict": "EIRP within the limit (margin +0.0 dB); off-time met (26.60 ms of the 25.5 ms required)",
+   "why": "the sweep 58-62 GHz lies inside the 57-71 GHz band"
+  },
+  "detection": {
+   "pd": 1.0,
+   "pfa": 0.0001,
+   "quant_share_db": 0.06790524873096615,
+   "range_at_pd": {
+    "criterion": "the SNR of one look meets what the map's CA-CFAR needs for this Pd (cfar.snr_pd90_db: its threshold's fluctuation and the target's own leak into its training cells included)",
+    "if_band_range_m": 14.9896229,
+    "limited_by": "if_band",
+    "n_looks": 1,
+    "not_included": [
+     "scalloping at a particular range",
+     "the LO's noise floor",
+     "mutual coupling",
+     "the receiver's compression by the TX leakage"
+    ],
+    "pd": 0.9,
+    "pfa": 0.0001,
+    "range_m": 14.9896229,
+    "snr_limited_range_m": 28.77591151711674,
+    "snr_required_db": 12.239994299053524
+   },
+   "snr_cell_db": 43.339039461004404,
+   "snr_chirp_db": 27.038152311722342
+  },
+  "inputs": {
+   "nf_db": {
+    "source": "spec",
+    "value": 12.0
+   },
+   "oxygen_db_per_km": {
+    "source": "derived",
+    "value": 14.651
+   },
+   "p1db_inband_dbm": {
+    "source": "spec",
+    "value": -34.0
+   },
+   "range_m": {
+    "source": "config",
+    "value": 5.0
+   },
+   "rcs_dbsm": {
+    "source": "spec",
+    "value": -10.0
+   },
+   "rx_gain_db": {
+    "source": "assumed",
+    "value": 40.0
+   },
+   "rx_gain_dbi": {
+    "source": "assumed",
+    "value": 10.0
+   },
+   "tx_backoff_db": {
+    "source": "assumed",
+    "value": 8.0
+   },
+   "tx_gain_dbi": {
+    "source": "assumed",
+    "value": 10.0
+   },
+   "tx_power_dbm": {
+    "source": "spec",
+    "value": 12.0
+   },
+   "wavelength_m": {
+    "source": "config",
+    "value": 0.004996540966666667
+   }
+  },
+  "leakage": null,
+  "nonlinearity": {
+   "engine": "event",
+   "ghosts": [
+    [
+     -10.305365743749999,
+     -34.072575267682005
+    ],
+    [
+     2.8105542937499997,
+     -35.18795936921869
+    ],
+    [
+     -2.8105542937499997,
+     -35.474895114357196
+    ],
+    [
+     4.68425715625,
+     -37.9641397016512
+    ],
+    [
+     -15.9358428455625,
+     -37.965441264486294
+    ],
+    [
+     -12.179068606249999,
+     -38.36148222417893
+    ]
+   ],
+   "ghosts_quiet": [
+    [
+     -10.305365743749999,
+     -34.072575267682005
+    ],
+    [
+     2.8105542937499997,
+     -35.18795936921869
+    ],
+    [
+     -2.8105542937499997,
+     -35.474895114357196
+    ],
+    [
+     4.68425715625,
+     -37.9641397016512
+    ],
+    [
+     -15.9358428455625,
+     -37.965441264486294
+    ],
+    [
+     -12.179068606249999,
+     -38.36148222417893
+    ]
+   ],
+   "ghosts_vouched": true,
+   "islr_db": -22.37298515083284,
+   "peak_sidelobe_db": -31.485030234516685,
+   "phase_peak_rad": 0.47024647418321186,
+   "phase_rms_rad": 0.13257208235169543,
+   "ramp": 2,
+   "width_3db_m": 0.05343183795229936,
+   "width_rayleigh_m": 0.06105272762834488
+  },
+  "phase_noise": {
+   "floor": [
+    {
+     "map_shift_db": 0.0,
+     "offset_m": 0.1,
+     "per_bin_dbc": -71.44222127876871,
+     "per_cell_dbc": -87.74310842805077,
+     "per_cell_map_dbc": -87.74310842805077
+    },
+    {
+     "map_shift_db": 0.0,
+     "offset_m": 0.25,
+     "per_bin_dbc": -69.29353622152752,
+     "per_cell_dbc": -85.59442337080958,
+     "per_cell_map_dbc": -85.59442337080958
+    },
+    {
+     "map_shift_db": 0.0,
+     "offset_m": 0.5,
+     "per_bin_dbc": -65.34425462009602,
+     "per_cell_dbc": -81.64514176937809,
+     "per_cell_map_dbc": -81.64514176937809
+    },
+    {
+     "map_shift_db": 0.0,
+     "offset_m": 1.0,
+     "per_bin_dbc": -59.390462054611596,
+     "per_cell_dbc": -75.69134920389365,
+     "per_cell_map_dbc": -75.69134920389365
+    },
+    {
+     "map_shift_db": 0.0,
+     "offset_m": 2.0,
+     "per_bin_dbc": -52.25812962178562,
+     "per_cell_dbc": -68.55901677106768,
+     "per_cell_map_dbc": -68.55901677106768
+    },
+    {
+     "map_shift_db": 0.0,
+     "offset_m": 5.0,
+     "per_bin_dbc": -49.406871328813075,
+     "per_cell_dbc": -65.70775847809513,
+     "per_cell_map_dbc": -65.70775847809513
+    }
+   ],
+   "lo_rms_rad": 0.27303785605466313,
+   "local_cell_dbc": -81.7519331761199,
+   "mean_cell_dbc": -66.5600226132622,
+   "notes": [
+    "The noise is a file's, the chirp is this library's two-point ADPLL's: the generator's TDC and DCO quantisation is added to the file's profile (the cycle-accurate chirp curve carries it, the file does not)."
+   ],
+   "parked": {
+    "dead_zone_center": null,
+    "dead_zone_idle": null,
+    "dither_bins": null,
+    "fcw_center": null,
+    "fcw_idle": null,
+    "idle_fraction": 0.0,
+    "idle_s": 0.0,
+    "known": false
+   },
+   "residual_rms_rad": 0.06962124653251818
+  },
+  "radar": {
+   "adc_bits": 12,
+   "adc_fs_msps": 10.0,
+   "band": "60g_sensing",
+   "center_ghz": 60.0,
+   "chirp_us": 100.0,
+   "idle_us": 0.0,
+   "if_bw_mhz": 4.0,
+   "lo_dco_ghz": 15.0,
+   "lo_engine": "event",
+   "lo_fref_mhz": 100.0,
+   "lo_loop_bw_mhz": 1.0,
+   "lo_mult": 4,
+   "lo_source": "pllsim_wu19_x10_60p48g_floor150.yaml: pllsim preset bench_wu19_spll_frac_52m_6p253g, linear model (analyze), pllsim 0+unknown, commit d67043e11976 x4; plus the chirp generator's TDC and DCO quantisation (the vendored ADPLL's analyze())",
+   "max_range_m": 14.9896229,
+   "max_velocity_mps": 12.491352416666667,
+   "n_chirps": 64,
+   "range_res_m": 0.05343582260989627,
+   "range_res_rect_m": 0.03747405725,
+   "range_window": "hann",
+   "slope_mhz_per_us": 40.0,
+   "sweep_ghz": 4.0,
+   "velocity_res_mps": 0.39035476302083333,
+   "window_sidelobe_db": -32.17281525364844
+  },
+  "target": {
+   "angle_deg": 0.0,
+   "beat_khz": 1334.2563807926083,
+   "doppler_bin": 5.123544502243616,
+   "doppler_hz": 800.553828475565,
+   "in_if_band": true,
+   "kind": "human",
+   "range_bin": 133.42563807926084,
+   "range_m": 5.0,
+   "rcs_dbsm": -10.0,
+   "rcs_source": "spec",
+   "velocity_mps": 2.0
+  },
+  "targets": [
+   {
+    "angle_deg": 0.0,
+    "beat_hz": 1334256.3807926083,
+    "doppler_hz": 800.553828475565,
+    "hpf_db": 0.0,
+    "in_if_band": true,
+    "interference_dbc": null,
+    "interference_kind": null,
+    "interferer": null,
+    "kind": "human",
+    "margin_db": null,
+    "masked": false,
+    "pd": 1.0,
+    "ps_adc_dbm": -53.10821704321796,
+    "range_m": 5.0,
+    "rcs_dbsm": -10.0,
+    "rcs_source": "spec",
+    "snr_cell_db": 43.339039461004404,
+    "velocity_mps": 2.0
+   }
+  ]
+ }
+}
