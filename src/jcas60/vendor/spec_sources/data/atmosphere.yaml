@@ -1,4 +1,4 @@
-# Vendored from spec_sources@da5472183fc4b9447fbbd036d2e2d22ff30f7b0a: src/spec_sources/data/atmosphere.yaml
+# Vendored from spec_sources@98b1d1b33d091ccd3133775610ced59e8bf72c16: src/spec_sources/data/atmosphere.yaml
 # Adapted-copy policy: see src/jcas60/vendor/__init__.py
 # atmosphere —— 大气衰减：ITU-R P.676 的逐线法与它推出的海平面比衰减。
 #

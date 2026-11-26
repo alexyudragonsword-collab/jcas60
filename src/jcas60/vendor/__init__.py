@@ -8,7 +8,7 @@ and what they import, are copied; code outside this tree imports them through
 
 Pins
 ----
-* ``spec_sources/`` -- spec_sources @ ``da5472183fc4b9447fbbd036d2e2d22ff30f7b0a``:
+* ``spec_sources/`` -- spec_sources @ ``98b1d1b33d091ccd3133775610ced59e8bf72c16``:
   the reader and five tables (``ieee80211`` -- the Golay sequences, the CEF
   layout, the EDMG SC numbers and PPDU lengths, the DMG timing; ``regulatory``
   -- 47 CFR 15.255, the communication limits and the radar tiers;
@@ -24,8 +24,10 @@ Pins
   spec_sources#59 the pin also holds two measured 60 GHz compression curves and
   a second radar chip's datasheet figures (``rx60.*``), the length-256 / 512
   Golay pairs (``edmg.golay_sequences_long``), the bistatic BRP exchange's
-  fields, and BRPIFS corrected from 20 to 44 us.  Every number about the
-  outside world enters here (law 1).
+  fields, and BRPIFS corrected from 20 to 44 us; one commit later (this pin)
+  ``regulatory`` also holds how a radar's occupied bandwidth is measured
+  (47 CFR 2.1049, FCC 23-35 para. 62), which this library does not read yet.
+  Every number about the outside world enters here (law 1).
 
 * ``mmw60/`` -- mmw60_trx @ ``442fabd99c16b0e6cfc4432d35fe64dc053dc515`` (0.3.0 plus its unreleased
   ``ay/preamble.py``, mmw60_trx#89):

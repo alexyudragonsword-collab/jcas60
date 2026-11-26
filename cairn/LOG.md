@@ -3,6 +3,10 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短（摘要 + 指针），
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-26 · 结果：spec_sources 的 pin 跟到 98b1d1b（feat/repin-spec-sources-98b1d1b）
+
+预期在下一条（`15416d0`）。P1–P3 都对：6 个 vendored 文件里只有 `data/regulatory.yaml` 变，`vendor_check --strict` 21 个文件全 verbatim；指纹 2529 个值逐位相同（文本哈希也没动），三个示例的期望输出逐字不变；测试不用改。两条新条目（占用带宽）本库还没有读，记在 ROADMAP“报回上游”：fmcw_radar#46 用上之后 A 行可能动，到时两个 pin 一起跟。
+
 ## 2026-11-26 · 预期：spec_sources 的 pin 跟到 98b1d1b（feat/repin-spec-sources-98b1d1b；跑之前写）
 
 **漏读的一条**：spec_sources#59 里对方 14:28 补了一条评论（可以直接 pin 到 `98b1d1b`，为 fmcw_radar#46 合并的），我 15:02 回报验收、关 issue 之前没有重读评论，pin 停在了 `da54721`。用户问起才发现。以后关 issue、开 PR 之前重读一遍评论。
