@@ -72,6 +72,7 @@ ALLOWED = {
     "wavesim.py": {16, 64},                                      # the phase-noise grid's length in buffers; pulse-tail guard in chips
     "table.py": {0.75, 97, 3.0103, 1e-40, 100, 180, 34, 92},    # scan grids, -3 dB, formatting widths
     "config.py": set(), "frontend.py": set(), "field.py": set(), "regulatory.py": set(), "fmcw_row.py": set(), "sources.py": set(), "bf.py": set(), "studies.py": set(),
+    "rxarray.py": {14},                                          # a column width
     "arrays.py": {4001},                                         # the band integral's grid
     "__init__.py": set(),
 }

@@ -65,6 +65,8 @@ class Options:
     random_packet_phase: bool = False  # bistatic: an unknown carrier phase per packet (no common LO)
     cfo_hz: float = 0.0                # bistatic: what is left of the two devices' carrier offset, turning everything received
     seed: int = 1
+    noise_seed: int | None = None      # a stream of its own for the thermal noise and the dither (default: the one stream of
+    #                                    ``seed``): the chains of a receive array share the LO's phase noise and nothing else
     n_packets: int | None = None       # default: the setup's
 
 
@@ -193,6 +195,7 @@ class Simulator:
         s, opt = self.s, opt or Options()
         m = int(opt.n_packets or s.n_packets.value)
         rng = np.random.default_rng([int(opt.seed), int(frame_index)])
+        rng_n = rng if opt.noise_seed is None else np.random.default_rng([int(opt.noise_seed), int(frame_index)])
         lam = s.wavelength_m
         sigma = math.sqrt(undb(s.fe.noise_density_dbm_hz.value) * self.g_fs / 2.0)      # per quadrature, per sample
         if self.up > 1 and opt.lo is not None:
@@ -223,7 +226,7 @@ class Simulator:
             if phi_rx is not None:
                 y *= np.exp(-1j * phi_rx)
             if opt.noise:
-                y += sigma * (rng.standard_normal(self.g_n) + 1j * rng.standard_normal(self.g_n))
+                y += sigma * (rng_n.standard_normal(self.g_n) + 1j * rng_n.standard_normal(self.g_n))
             if opt.rx_p1db_dbm is not None:                                            # the receiver's compression, on signal and noise alike
                 y = _rapp(y, math.sqrt(undb(opt.rx_p1db_dbm)), s.rx_rapp_p.value)
             if self.up > 1:                                                            # the anti-alias filter and the ADC's sampling
@@ -233,7 +236,7 @@ class Simulator:
                     full_scale = math.sqrt(float(np.mean(np.abs(y[seg]) ** 2))) * 10.0 ** (s.adc_backoff_db.value / 20.0)
                 if opt.adc_dither_lsb:
                     lsb = 2.0 * full_scale / 2.0 ** opt.adc_enob
-                    y = y + opt.adc_dither_lsb * lsb * (rng.standard_normal(self.n) + 1j * rng.standard_normal(self.n))
+                    y = y + opt.adc_dither_lsb * lsb * (rng_n.standard_normal(self.n) + 1j * rng_n.standard_normal(self.n))
                 yq = self._quantise(y, full_scale, opt.adc_enob)
                 errors.append(yq[seg] - y[seg])
                 y = yq

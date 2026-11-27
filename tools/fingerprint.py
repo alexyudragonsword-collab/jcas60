@@ -124,6 +124,12 @@ def record() -> dict:
     for k in sorted(k for k in ar if k != "setup"):
         _flat(f"arrays.{k}", ar[k], out)
     _flat("arrays.text", hashlib.sha256(arrays.render(ar).encode()).hexdigest(), out)
+    # the receive array (milestone 1; example 03)
+    from jcas60 import rxarray
+    rx = rxarray.build()
+    for k in sorted(k for k in rx if k != "setup"):
+        _flat(f"rxarray.{k}", rx[k], out)
+    _flat("rxarray.text", hashlib.sha256(rxarray.render(rx).encode()).hexdigest(), out)
     return out
 
 

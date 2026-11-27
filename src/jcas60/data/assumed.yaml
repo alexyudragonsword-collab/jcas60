@@ -181,3 +181,10 @@ entries:
     source: assumed
     cite: "本库；阵列的几何与阵因子是 arraytx 的 geometry / beam（经 mmw60_trx vendor）"
     note: "里程碑 1 第一步的发射阵列（jcas60.arrays，示例 02）：均匀直线阵，间距半波长，每个单元一个与单天线时相同的 PA 与相同增益的单元天线（jcas60.antenna_gain_dbi 的发射那一项当作单元增益），单元方向图取 arraytx 的 cos；相位扫描（不是真时延）；接收仍是一根天线。视场取 ±60°，相邻波束在 −3 dB 处相交（指半功率 3.01 dB，arraytx 的波束宽度就是这个电平；波束按 sin θ 等间隔、居中摆）。squint_elements / simulated_elements：波束偏斜与波形级的那条路各在几个单元上量。换了会动什么：单元数每 ×2，满功率 EIRP +6 dB、波束窄一半、要扫的方向数 ×2；间距大于半波长在 ±60° 内出栅瓣；视场取小方向数按 sin 比例少；接收也用阵列时 SNR 再 +10·log10(N)，这里没有算。单站的泄漏：每个单元到接收天线的隔离都取单天线的那个数；相位扫描下 N 路泄漏是同一个波形，按相量相加，相位没有模型，给两个界（功率相加、全部同相），同相那个界就是表里原来的式子；隔离随单元远近变、相位随波束指向变，都没有建模，换了示例 02 §5 的每个数都动。10 dBi 的单元增益与半波长的间距并不自洽（10 dBi 的口径比半波长大），这是两头借数的结果，单元天线没有建模。"
+
+  jcas60.rx_array:
+    value: {rx_elements: [1, 2, 4, 8, 16], simulated_elements: 8, target_angle_deg: 20, angle_trials: 32, leak_frames: 4}
+    unit: "-, -, 度, 帧, 帧"
+    source: assumed
+    cite: "本库；阵列的几何与阵因子是 arraytx 的 geometry / beam（经 mmw60_trx vendor）；单元、间距、视场沿用 jcas60.array"
+    note: "里程碑 1 第二步的接收阵列（jcas60.rxarray，示例 03）：N 个接收单元各带一条与表里相同的接收链与 ADC，共用一个本振，波束在数字域合成；单元增益取表里接收天线的那个数（与 λ/2 的间距不自洽，同 jcas60.array）。simulated_elements / target_angle_deg：波形级那条路在几个单元、目标在哪个方向上量；angle_trials：测角误差统计几帧（32 帧时 rms 的统计误差约 ±13 %）；leak_frames：带泄漏的读数平均几帧。泄漏在各接收单元上的相位没有模型，用“像从哪个方向来的波”参数化，给三种情形（正在波束方向、主瓣裙上剩 1/N、第一个零点）。换了会动什么：单元数每 ×2，只收不发阵列的 SNR +3 dB（两种法规读法都是）、测角的 CRLB 约 ÷2.8；目标方向偏离正侧向，单元方向图两程按 cos⁴ 掉；各接收链不共用本振时泄漏上的相噪残余不再相干，三种情形合成一种（功率相加）。"

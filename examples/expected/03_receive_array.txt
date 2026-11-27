@@ -1,0 +1,39 @@
+engine: closed-form radar budget + chip-level waveform simulation (linear channel, point target; the receiver's compression is a memoryless limiter, the transmitter is linear) -- no AM/PM, no memory, no spur conclusions
+sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11 holds what was checked against spec_sources' 802.11bf entries, item by item)
+
+== 1. three ways to spend N elements (line, 0.5 lambda apart, cos element pattern; row B at 5 m, SNR(cell), closed form; L-CEF / TRN field) ==
+  rx only: one transmit antenna, N receive chains, beams formed afterwards -- every direction from one frame
+  tx swept: N transmit elements, one receiver, a frame per beam (example 02); at the same air time each beam gets 1 / beams of the packets
+  both: N transmit elements swept, N receive chains
+  communication limit:
+     N  beams        one antenna            rx only           tx swept    tx swept, same air time               both
+     1      1  30.74 / 43.75 dB  30.74 / 43.75 dB  30.74 / 43.75 dB          30.74 / 43.75 dB  30.74 / 43.75 dB
+     2      2  30.74 / 43.75 dB  33.75 / 46.76 dB  36.76 / 49.77 dB          33.75 / 46.76 dB  39.77 / 52.78 dB
+     4      4  30.74 / 43.75 dB  36.76 / 49.77 dB  42.78 / 55.79 dB          36.76 / 49.77 dB  48.80 / 61.82 dB
+     8      8  30.74 / 43.75 dB  39.77 / 52.78 dB  48.74 / 61.75 dB          39.71 / 52.72 dB  57.77 / 70.78 dB
+    16     16  30.74 / 43.75 dB  42.78 / 55.79 dB  48.74 / 61.75 dB          36.70 / 49.71 dB  60.78 / 73.79 dB
+  radar limit:
+     N  beams        one antenna            rx only           tx swept    tx swept, same air time               both
+     1      1  28.74 / 41.75 dB  28.74 / 41.75 dB  28.74 / 41.75 dB          28.74 / 41.75 dB  28.74 / 41.75 dB
+     2      2  28.74 / 41.75 dB  31.75 / 44.76 dB  28.74 / 41.75 dB          25.73 / 38.74 dB  31.75 / 44.76 dB
+     4      4  28.74 / 41.75 dB  34.76 / 47.77 dB  28.74 / 41.75 dB          22.72 / 35.73 dB  34.76 / 47.77 dB
+     8      8  28.74 / 41.75 dB  37.77 / 50.78 dB  28.74 / 41.75 dB          19.71 / 32.72 dB  37.77 / 50.78 dB
+    16     16  28.74 / 41.75 dB  40.78 / 53.79 dB  28.74 / 41.75 dB          16.70 / 29.71 dB  40.78 / 53.79 dB
+  air time: rx only x1, tx swept and both x beams.  Velocity resolution 0.39 m/s; tx swept at the same air time, N = 8: 3.10 m/s
+  receive chains: rx only and both N, tx swept 1; each is the table's receiver and ADC (3.52 GS/s complex, ENOB 9.09)
+
+== 2. the chains combined, on the second road (N = 8, one transmit antenna, the target at 20 deg; L-CEF, communication limit; 32 frames) ==
+  one chain: closed on the grid 28.79 dB (the element's pattern both ways: -1.08 dB), simulated 28.93 dB
+  combined:  closed 37.82 dB, simulated 37.82 dB; the gain: closed 9.03 dB, simulated 8.89 dB
+  the direction from one frame (the combined cell at its largest, searched inside the 13.63 deg beam): rms error 0.0828 deg, mean +0.0139 deg; Cramer-Rao bound 0.0770 deg
+
+== 3. the leakage in every chain (one transmit antenna, N = 8; each chain at 40 dB of isolation, antenna arrays with EBG: leakage -28 dBm; limiter, LO phase noise and ADC on; 4 frames) ==
+  each chain compresses on its own: the isolation needed is one antenna's, 43.24 dB (in-band compression); the array does not relax it
+  one chain: without leakage 28.79 dB; with it, closed 22.80 dB, simulated 22.84 dB (echo -9.92 dB, phase noise -0.24 dB and ADC -3.34 dB against the thermal floor)
+  combined, without leakage: closed 37.82 dB, simulated 37.90 dB
+    the leakage comes through the combiner   as if from   left of it   SNR closed   simulated   difference
+                               at the look    20.00 deg        1.000     26.09 dB    25.86 dB     -0.23 dB
+                  on the skirt, 1 / N left    31.37 deg        0.125     31.83 dB    31.55 dB     -0.28 dB
+                         in the first null    36.30 deg        0.000     34.00 dB    33.90 dB     -0.10 dB
+  combined, the echo adds in amplitude; each chain's thermal and ADC noise in power; the phase-noise residue is the same in every chain (one LO, one waveform) and follows the leakage
+  through the combiner.  The leakage's phases across the elements are not modelled: the three rows span what they can do
