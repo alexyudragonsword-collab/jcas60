@@ -10,10 +10,11 @@ beams are formed afterwards:
 2. The simulated chains combined: the SNR, and how well one frame tells the
    target's direction (against the Cramer-Rao bound).
 3. The transmit leakage in every chain.
+4. A null on the leakage: by projection and adaptively.
 
     python examples/03_receive_array.py
 
-About 55 s.  ``tools/example_drift.py`` compares the output with
+About 95 s.  ``tools/example_drift.py`` compares the output with
 ``examples/expected/03_receive_array.txt``.
 """
 import sys

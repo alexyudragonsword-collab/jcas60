@@ -130,3 +130,72 @@ def test_the_chains_share_the_lo_and_nothing_else():
     noisy = [sim.frame(p, W.Options(seed=1, noise_seed=k, n_packets=2)).cir for k in (2, 3)]
     assert not np.allclose(noisy[0], noisy[1])
     assert np.array_equal(sim.frame(p, W.Options(seed=1, n_packets=2)).cir, sim.frame(p, W.Options(seed=1, noise_seed=None, n_packets=2)).cir)
+
+
+# ----------------------------------------------------------------------------- 4. a null on the leakage
+def _null_row(rx, share):
+    return next(r for r in rx["nulling"]["rows"] if r["share"] == share)
+
+
+def test_law4_three_combiners_on_the_same_frames(rx):
+    """Closed form against the simulated chains for every combiner at every share of the leakage: within 0.5 dB."""
+    z = rx["nulling"]
+    assert [r["share"] for r in z["rows"]] == [1.0, 0.9, 0.5, 0.125, 0.0] and z["floor_cells"] > 1000 * z["n"]
+    for r in z["rows"]:
+        for how, m in r["methods"].items():
+            if m["snr_closed_db"] is None:
+                assert (how, r["share"], m["snr_sim_db"]) == ("projected", 1.0, None)
+                continue
+            assert abs(m["snr_sim_db"] - m["snr_closed_db"]) < 0.5, (r["share"], how)
+    conv = [_null_row(rx, x)["methods"]["conventional"]["snr_closed_db"] for x in (1.0, 0.5, 0.125, 0.0)]
+    assert conv == pytest.approx([26.09, 28.45, 31.83, 34.00], abs=0.006)
+    # section 3's cases are these rows' conventional column
+    for q in rx["leakage"]["cases"]:
+        assert _null_row(rx, q["share"])["methods"]["conventional"]["snr_closed_db"] == pytest.approx(q["snr_closed_db"], abs=1e-9)
+        assert _null_row(rx, q["share"])["methods"]["conventional"]["snr_sim_db"] == pytest.approx(q["snr_sim_db"], abs=1e-9)
+
+
+def test_the_projected_null_takes_the_leakage_out_and_pays_in_gain_at_the_look(rx):
+    """The leakage read off the zero-Doppler ridge is good to better than 40 dB; what the null costs is the share of
+    the look that lay along the leakage -- 10 log10(1 - share) -- so it is blind at the look and loses near it."""
+    for r in rx["nulling"]["rows"]:
+        m = r["methods"]["projected"]
+        assert m["leak_left_db"] < -40.0
+        if r["share"] < 1.0:
+            assert m["look_gain_db"] == pytest.approx(db(1.0 - r["share"]), abs=0.01) == pytest.approx(r["look_gain_projected_closed_db"], abs=0.01)
+        else:
+            assert m["look_gain_db"] < -40.0 and r["look_gain_projected_closed_db"] is None
+        assert r["methods"]["conventional"]["look_gain_db"] == 0.0
+    gain = {x: _null_row(rx, x)["methods"]["projected"]["snr_closed_db"] - _null_row(rx, x)["methods"]["conventional"]["snr_closed_db"] for x in (0.9, 0.5, 0.125, 0.0)}
+    assert gain[0.9] == pytest.approx(-2.47, abs=0.02) and gain[0.5] == pytest.approx(2.54, abs=0.02) and gain[0.125] == pytest.approx(1.59, abs=0.02)
+    assert gain[0.0] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_the_adaptive_combiner_is_never_under_the_other_two(rx):
+    """R^-1 a is the best any weights do: on both roads it is at least the conventional and the projected figure
+    (the simulated ones within the frames' scatter), and at the look, where no null can be placed, it is the
+    conventional combiner."""
+    for r in rx["nulling"]["rows"]:
+        m = r["methods"]
+        others = [m[h]["snr_closed_db"] for h in ("conventional", "projected") if m[h]["snr_closed_db"] is not None]
+        assert m["adaptive"]["snr_closed_db"] >= max(others) - 1e-9
+        assert m["adaptive"]["snr_sim_db"] >= max(m[h]["snr_sim_db"] for h in ("conventional", "projected") if m[h]["snr_sim_db"] is not None) - 0.1
+        assert m["adaptive"]["snr_closed_db"] <= rx["nulling"]["null_limit_closed_db"] + 1e-9 < rx["nulling"]["no_leak_closed_db"]
+    look = _null_row(rx, 1.0)["methods"]
+    assert look["adaptive"]["snr_closed_db"] == pytest.approx(look["conventional"]["snr_closed_db"], abs=1e-9)
+    assert _null_row(rx, 0.5)["methods"]["adaptive"]["snr_closed_db"] == pytest.approx(31.64, abs=0.006)
+
+
+def test_a_null_costs_one_beams_worth_whatever_the_leakage_looks_like(rx):
+    """Parseval over the N orthogonal beams: the shares of any vector sum to one, so the projected null's gain,
+    averaged over the beams, is 1 - 1 / N -- no model of the leakage's phases needed."""
+    z = rx["nulling"]
+    assert z["mean_gain_closed_db"] == pytest.approx(db(1.0 - 1.0 / 8)) == pytest.approx(-0.58, abs=0.006)
+    assert set(z["beam_sums"]) == {"a plane wave's phases", "random gains and phases"}
+    for v in z["beam_sums"].values():
+        assert v["sum"] == pytest.approx(1.0, abs=1e-12) and v["mean_gain_db"] == pytest.approx(z["mean_gain_closed_db"], abs=1e-9) and 0.0 < v["largest"] < 1.0
+    s = rx["setup"]
+    g = arrays.geometry(s, 8)
+    one_beam = np.conj(rxarray.weights(s, g, 0.0))                                 # a vector that is one of the beams: all of it in that beam
+    shares = rxarray.beam_shares(s, g, one_beam)
+    assert shares.max() == pytest.approx(1.0, abs=1e-12) and np.sort(shares)[-2] < 1e-20
