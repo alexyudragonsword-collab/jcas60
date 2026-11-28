@@ -14,7 +14,11 @@ all on one LO, the beams formed in arithmetic afterwards -- and asks:
 3. what the transmit leakage does when it enters every chain: each chain
    compresses on its own, the phase-noise residue riding on the leakage is
    common to all of them (one LO, one waveform) and adds as the leakage's
-   phases across the elements make it.
+   phases across the elements make it;
+4. what a combiner that puts a null on the leakage gets back: the leakage is
+   one waveform, so across the chains it is one complex vector whatever its
+   phases are, and the data give it -- by projection (the vector read off
+   the zero-Doppler ridge) and adaptively (the covariance of the map's floor).
 
 The array is arraytx's geometry (vendored through mmw60_trx), the element and
 the spacing are example 02's (``jcas60.array``), and the receive chains are
@@ -210,6 +214,122 @@ def leakage(s, bench) -> dict:
             "echo_db": c["echo_db"], "pn_over_thermal_db": c["pn_over_thermal_db"], "adc_over_thermal_db": c["adc_over_thermal_db"], "cases": cases}
 
 
+# ----------------------------------------------------------------------------- 4. a null on the leakage
+METHODS = ("conventional", "projected", "adaptive")
+
+
+def leak_signature(sim: W.Simulator, cirs: np.ndarray, leak_delay_s: float) -> np.ndarray:
+    """The leakage across the chains, from the data: it is static, so each chain's packets averaged at the leakage's
+    lag hold its complex gain there (the echo and the noise average down, the phase-noise residue with them)."""
+    return cirs[:, :, int(round(leak_delay_s * sim.fs)) - sim.lag_lo].mean(axis=1)
+
+
+def floor_cells(s, sim: W.Simulator, shape: tuple, cell: tuple) -> np.ndarray:
+    """The cells of a map that hold neither the zero-Doppler ridge, nor the leakage's own lags, nor the target and
+    its neighbours, nor the lags past the clean zone: what the adaptive combiner learns the floor's covariance on."""
+    m, n_lags = shape
+    ex_d, ex_r = int(s.sim["exclude_doppler_bins"]), int(s.sim["exclude_range_lags"]) * sim.osr
+    i, j = cell
+    rows = (np.abs(np.arange(m) - m // 2) > ex_d) & (np.abs(np.arange(m) - i) > ex_d)
+    cols = (sim.lags > ex_r) & (sim.lags <= (sim.field.zero_sidelobe_chips - int(s.sim["exclude_range_lags"])) * sim.osr) & (np.abs(np.arange(n_lags) - j) > ex_r)
+    return rows[:, None] & cols[None, :]
+
+
+def null_weights(s, sim: W.Simulator, geom, cirs: np.ndarray, theta_deg: float, how: str, cell: tuple) -> np.ndarray:
+    """The combiner u (the output is u^H x) for a look at ``theta``.  ``conventional``: the look's own signature a.
+    ``projected``: a with its part along the leakage's signature taken out -- a null on the leakage, whatever its
+    phases.  ``adaptive``: R^-1 a with R the chains' covariance over the map's floor cells (thermal and ADC noise
+    on the diagonal, the phase-noise residue along the leakage's signature): the most SNR any weights give."""
+    a = np.conj(weights(s, geom, theta_deg))
+    if how == "conventional":
+        return a
+    if how == "projected":
+        v = leak_signature(sim, cirs, s.leak_delay_s.value)
+        return a - v * (np.vdot(v, a) / np.vdot(v, v))
+    if how == "adaptive":
+        rds = np.array([_rd.doppler_fft(c, s.doppler_window, 1) for c in cirs])
+        x = rds[:, floor_cells(s, sim, rds.shape[1:], cell)]
+        return np.linalg.solve(x @ x.conj().T / x.shape[1], a)
+    raise ValueError(how)
+
+
+def beam_shares(s, geom, v: np.ndarray) -> np.ndarray:
+    """What share of a signature ``v`` each of the N orthogonal beams of the array receives.  They sum to one
+    (Parseval), whatever v is: a null on the leakage costs one beam's worth of gain in all, spread as v spreads it."""
+    n = geom.n
+    looks = [math.degrees(math.asin(k / (n * geom.spacing_lambda))) for k in range(-(n // 2), n - n // 2)]
+    return np.array([abs(np.vdot(np.conj(weights(s, geom, th)), v)) ** 2 for th in looks]) / (n * float(np.vdot(v, v).real))
+
+
+def _level_db(sim: W.Simulator, share: float) -> float:
+    """A share of power in dB as a reading: one that is the arithmetic's rounding is recorded as what it stands for --
+    zero dB for a share of one, the simulator's rounding bound for a share of nothing."""
+    level = db(max(share, undb(sim.rounding_dbc)))
+    return 0.0 if abs(level) < 1e-9 else level
+
+
+def nulling(s, bench) -> dict:
+    """Section 3's set-up -- one transmit antenna, N chains, the table's leakage in each -- with the leakage coming
+    through the conventional combiner at several shares of its power, and three combiners on the same frames."""
+    n, theta = int(S.num(KEY + "#simulated_elements").value), S.num(KEY + "#target_angle_deg").value
+    frames = int(S.num(KEY + "#leak_frames").value)
+    geom, iso = AR.geometry(s, n), AR.geometry(s, n, "isotropic")
+    eirp = R.readings(s)[0].eirp_dbm
+    sim = bench.sim
+    link = B.link(s, "monostatic", eirp)
+    geo, tgt, _ = bench.paths("monostatic", link, 0.0)
+    near = int(round(geo.delay_s * sim.fs))
+    pattern_db = 4.0 * db(geom.element_gain(theta))
+    target = W.Path(tgt.power_dbm + pattern_db, tgt.delay_s, tgt.path_rate_mps, "target")
+    env = sim.unit_envelope(s.leak_delay_s.value)
+    cost = B.monostatic_cost(s, eirp, env)
+    level = cost.conducted_dbm.value - s.fe.isolation_db[-1][1].value
+    c = _with_leakage_closed(s, link, cost, env, level)
+    thermal = undb(c["thermal_db"])
+    pn, own = thermal * undb(c["pn_over_thermal_db"]), thermal * (1.0 + undb(c["adc_over_thermal_db"]))     # the residue; each chain's own noise
+    top = link.snr_grid_db.value + pattern_db + db(n) + c["echo_db"]                # the echo combined, over one chain's undisturbed floor
+    on = {"adc_enob": s.adc_enob.value, "lo": "shared", "rx_p1db_dbm": s.fe.p1db_inband_dbm.value}
+    leak = W.Path(level, s.leak_delay_s.value, 0.0, "leakage")
+    a = np.conj(weights(s, geom, theta))
+    rows = []
+    for share in (float(x) for x in S.raw(KEY + "#null_shares")):
+        th = theta if share >= 1.0 else _direction_at(iso, theta, share, "phase")
+        v_true = np.conj(weights(s, geom, th))
+        closed = {"conventional": top - db(own + n * share * pn),
+                  "projected": None if share >= 1.0 else top + db(1.0 - share) - db(own),
+                  "adaptive": top - db(own) + db(1.0 - share * n * pn / (own + n * pn))}
+        got = {how: {"peak": [], "floor": [], "gain": [], "left": []} for how in METHODS}
+        for k in range(frames):
+            cirs = chains(s, sim, geom, [(target, theta), (leak, th)], k, **on)
+            first = sim.read(combined(s, sim, geom, cirs, theta), near, (0,))
+            cell = (first["doppler_index"], first["lag"] - sim.lag_lo)
+            for how in METHODS:
+                u = null_weights(s, sim, geom, cirs, theta, how, cell)
+                cir = np.tensordot(np.conj(u), cirs, axes=1)
+                r = sim.read(W.Frame(cir=cir, lags_per_chip=sim.osr, lag0=-sim.lag_lo, rd=_rd.doppler_fft(cir, s.doppler_window, 1)), near, (0,))
+                norm = float(np.vdot(u, u).real) * n
+                got[how]["peak"].append(r["peak_mw"])
+                got[how]["floor"].append(r["floor_mw"])
+                got[how]["gain"].append(abs(np.vdot(u, a)) ** 2 / norm)
+                got[how]["left"].append(abs(np.vdot(u, v_true)) ** 2 / norm)
+        methods = {}
+        for how in METHODS:
+            g = got[how]
+            blind = closed[how] is None
+            methods[how] = {"snr_closed_db": closed[how], "snr_sim_db": None if blind else db(float(np.mean(g["peak"]) / np.mean(g["floor"]))),
+                            "look_gain_db": _level_db(sim, float(np.mean(g["gain"]))), "leak_left_db": _level_db(sim, float(np.mean(g["left"])))}
+        rows.append({"share": share, "direction_deg": th, "methods": methods,
+                     "look_gain_projected_closed_db": None if share >= 1.0 else db(1.0 - share)})
+    rng = np.random.default_rng(int(s.sim["seed"]))
+    random_v = rng.standard_normal(n) + 1j * rng.standard_normal(n)
+    plane = np.conj(weights(s, geom, _direction_at(iso, theta, 1.0 / n, "phase")))
+    sums = {"a plane wave's phases": beam_shares(s, geom, plane), "random gains and phases": beam_shares(s, geom, random_v)}
+    return {"n": n, "theta_deg": theta, "frames": frames, "rows": rows, "no_leak_closed_db": link.snr_grid_db.value + pattern_db + db(n), "null_limit_closed_db": top - db(own),
+            "floor_cells": int(floor_cells(s, sim, (int(s.n_packets.value), sim.lags.size), (0, 0)).sum()),
+            "beam_sums": {k: {"sum": float(v.sum()), "largest": float(v.max()), "mean_gain_db": db(float(np.mean(1.0 - v)))} for k, v in sums.items()},
+            "mean_gain_closed_db": db(1.0 - 1.0 / n)}
+
+
 # ----------------------------------------------------------------------------- all of it
 @lru_cache(maxsize=1)
 def build() -> dict:
@@ -217,9 +337,13 @@ def build() -> dict:
     bench = T._Bench(s)
     if S.num(AR.KEY + "#crossover_db").value != 3:
         raise ValueError("arraytx's beam width is the half-power one (3 dB)")
-    return {"setup": s, "ways": ways(s), "combination": combination(s, bench), "leakage": leakage(s, bench),
+    return {"setup": s, "ways": ways(s), "combination": combination(s, bench), "leakage": leakage(s, bench), "nulling": nulling(s, bench),
             "adc_fs_hz": s.adc_fs_hz.value, "adc_enob": s.adc_enob.value, "fov_deg": S.num(AR.KEY + "#field_of_view_deg").value,
             "spacing_lambda": S.num(AR.KEY + "#spacing_lambda").value, "element": str(S.raw(AR.KEY + "#element_pattern"))}
+
+
+def _d(v, fmt: str = "{:.2f}") -> str:
+    return "blind" if v is None else fmt.format(v)
 
 
 def render(t: dict | None = None) -> str:
@@ -264,4 +388,21 @@ def render(t: dict | None = None) -> str:
         w(f"{q['name']:>42s} {q['direction_deg']:8.2f} deg {q['share']:12.3f} {q['snr_closed_db']:9.2f} dB {q['snr_sim_db']:8.2f} dB {q['snr_sim_db'] - q['snr_closed_db']:+9.2f} dB")
     w("  combined, the echo adds in amplitude; each chain's thermal and ADC noise in power; the phase-noise residue is the same in every chain (one LO, one waveform) and follows the leakage")
     w("  through the combiner.  The leakage's phases across the elements are not modelled: the three rows span what they can do")
+    w("")
+    z = t["nulling"]
+    w("== 4. a null on the leakage (the same set-up and frames for three combiners; the leakage's vector across the chains is taken from the data, not from a model of its phases) ==")
+    w("  conventional: the look's own weights.  projected: the look's weights with their part along the leakage taken out (the leakage read off each chain's zero-Doppler ridge)")
+    w(f"  adaptive: R^-1 a, R the chains' covariance over the map's {z['floor_cells']} floor cells (no ridge, no leakage lags, no target)")
+    w(f"{'leakage left by the':>22s} {'as if':>10s} {'conventional':>22s} {'projected':>22s} {'adaptive':>22s} {'gain at the look, projected':>30s} {'adaptive':>10s} {'leakage left: projected':>25s} {'adaptive':>10s}")
+    w(f"{'conventional combiner':>22s} {'from':>10s} {'closed / simulated':>22s} {'closed / simulated':>22s} {'closed / simulated':>22s} {'closed / simulated':>30s}")
+    for r in z["rows"]:
+        m = r["methods"]
+        cells = " ".join(f"{_d(m[h]['snr_closed_db']):>9s} / {_d(m[h]['snr_sim_db']):>6s} dB" for h in METHODS)
+        w(f"{r['share']:22.3f} {r['direction_deg']:6.2f} deg {cells} {_d(r['look_gain_projected_closed_db']):>17s} / {m['projected']['look_gain_db']:6.2f} dB {m['adaptive']['look_gain_db']:7.2f} dB "
+          f"{m['projected']['leak_left_db']:22.1f} dB {m['adaptive']['leak_left_db']:7.1f} dB")
+    w(f"  without leakage {z['no_leak_closed_db']:.2f} dB; the most a null can give back {z['null_limit_closed_db']:.2f} dB (each chain's limiter has already taken its part: that is not undone)")
+    w("  the projection is blind where the leakage sits at the look, and loses to the conventional combiner near it; the adaptive weights are never under either")
+    b = z["beam_sums"]
+    w("  whatever the leakage's vector, the shares its N orthogonal beams receive sum to one: " + "; ".join(f"{k}: sum {v['sum']:.6f}, largest {v['largest']:.3f}" for k, v in b.items()))
+    w(f"  so a projected null costs one beam's worth of gain in all: {z['mean_gain_closed_db']:.2f} dB on the average beam (" + ", ".join(f"{v['mean_gain_db']:.2f}" for v in b.values()) + " dB counted)")
     return "\n".join(L) + "\n"

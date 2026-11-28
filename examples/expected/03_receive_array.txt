@@ -37,3 +37,18 @@ sensing with the 802.11ay waveform (no claim of 802.11bf conformance: section 11
                          in the first null    36.30 deg        0.000     34.00 dB    33.90 dB     -0.10 dB
   combined, the echo adds in amplitude; each chain's thermal and ADC noise in power; the phase-noise residue is the same in every chain (one LO, one waveform) and follows the leakage
   through the combiner.  The leakage's phases across the elements are not modelled: the three rows span what they can do
+
+== 4. a null on the leakage (the same set-up and frames for three combiners; the leakage's vector across the chains is taken from the data, not from a model of its phases) ==
+  conventional: the look's own weights.  projected: the look's weights with their part along the leakage taken out (the leakage read off each chain's zero-Doppler ridge)
+  adaptive: R^-1 a, R the chains' covariance over the map's 11200 floor cells (no ridge, no leakage lags, no target)
+   leakage left by the      as if           conventional              projected               adaptive    gain at the look, projected   adaptive   leakage left: projected   adaptive
+ conventional combiner       from     closed / simulated     closed / simulated     closed / simulated             closed / simulated
+                 1.000  20.00 deg     26.09 /  25.86 dB     blind /  blind dB     26.09 /  25.91 dB             blind / -44.37 dB   -0.42 dB                  -44.4 dB    -0.4 dB
+                 0.900  22.76 deg     26.47 /  26.29 dB     24.00 /  23.94 dB     27.90 /  27.88 dB            -10.00 / -10.00 dB   -3.38 dB                  -43.3 dB    -7.6 dB
+                 0.500  26.97 deg     28.45 /  28.23 dB     30.99 /  30.85 dB     31.64 /  31.62 dB             -3.01 /  -3.01 dB   -1.88 dB                  -42.5 dB   -15.5 dB
+                 0.125  31.37 deg     31.83 /  31.55 dB     33.42 /  33.17 dB     33.52 /  33.39 dB             -0.58 /  -0.58 dB   -0.44 dB                  -42.5 dB   -21.4 dB
+                 0.000  36.30 deg     34.00 /  33.90 dB     34.00 /  33.88 dB     34.00 /  33.99 dB              0.00 /  -0.00 dB   -0.02 dB                  -44.5 dB   -25.4 dB
+  without leakage 37.82 dB; the most a null can give back 34.00 dB (each chain's limiter has already taken its part: that is not undone)
+  the projection is blind where the leakage sits at the look, and loses to the conventional combiner near it; the adaptive weights are never under either
+  whatever the leakage's vector, the shares its N orthogonal beams receive sum to one: a plane wave's phases: sum 1.000000, largest 0.978; random gains and phases: sum 1.000000, largest 0.271
+  so a projected null costs one beam's worth of gain in all: -0.58 dB on the average beam (-0.58, -0.58 dB counted)
